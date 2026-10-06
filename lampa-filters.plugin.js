@@ -50,14 +50,17 @@
 
   var DRAWER_CSS = [
     '.lampa-filters-list{width:100%}',
-    '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:998}',
-    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:92vw;background:#1d1f20;z-index:999;box-shadow:-6px 0 24px rgba(0,0,0,.5);overflow-y:auto;padding-bottom:24px}',
+    '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:40}',
+    '.lampa-filters-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:49}',
+    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:92vw;background:#1d1f20;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5);overflow-y:auto;padding-bottom:24px}',
     '.lampa-filters-drawer__head{padding:18px 20px 4px;font-size:16px;color:#fff;font-weight:600}',
     '.lampa-filters-drawer .settings-param:first-of-type{margin-top:8px}',
-    '.lampa-filters-drawer__done{margin:12px 20px}'
+    '.lampa-filters-drawer__done{margin:12px 20px}',
+    '.lampa-filters-screen-btn{border-bottom:1px solid #232427}'
   ].join('');
 
   var drawer = null;
+  var backdrop = null;
   var drawerToggled = false;
   var fab = null;
 
@@ -80,6 +83,9 @@
 
   function openDrawer() {
     if (drawer) return;
+    backdrop = $('<div class="lampa-filters-backdrop"></div>');
+    backdrop.on('click', closeDrawer);
+    $('body').append(backdrop);
     drawer = $('<div class="lampa-filters-drawer"></div>');
     drawer.append('<div class="lampa-filters-drawer__head">Фильтр избранного</div>');
     var done = $('<div class="simple-button selector lampa-filters-drawer__done">Готово</div>');
@@ -106,19 +112,49 @@
     if (!drawer) return;
     drawer.remove();
     drawer = null;
+    if (backdrop) {
+      backdrop.remove();
+      backdrop = null;
+    }
     if (drawerToggled) {
       drawerToggled = false;
       Lampa.Controller.back();
     }
     var active = Lampa.Activity.active();
-    if (active && active.component === 'favorite') Lampa.Activity.refresh();
+    if (active && active.component === 'favorite') {
+      Lampa.Activity.refresh();
+      setTimeout(function () {
+        injectScreenButton({ object: Lampa.Activity.active() });
+      }, 1500);
+    }
+  }
+
+  function injectScreenButton(event) {
+    try {
+      var object = event.object;
+      var html = object && object.activity && object.activity.render ? object.activity.render() : null;
+      if (!html || !html.find) return;
+      var target = html.find('.scroll__body').first();
+      if (!target.length) target = html.find('.scroll__content').first();
+      if (!target.length || target.find('.lampa-filters-screen-btn').length) return;
+      var btn = $('<div class="settings-param selector lampa-filters-screen-btn">' +
+        '<div class="settings-param__name">Фильтр избранного</div>' +
+        '<div class="settings-param__value">настроить</div></div>');
+      btn.on('hover:enter', openDrawer);
+      target.prepend(btn);
+    } catch (error) {
+      console.warn('[lampa-filters]', error);
+    }
   }
 
   function hookFavoritesScreen() {
     Lampa.Listener.follow('activity', function (event) {
       if (event.component !== 'favorite') return;
       if (event.type === 'destroy') removeFab();
-      else ensureFab();
+      else {
+        ensureFab();
+        injectScreenButton(event);
+      }
     });
   }
 
@@ -358,6 +394,13 @@
       refreshEnabled();
     }
 
+    if (main) {
+      var exit = mk('Вернуться в настройки');
+      exit.el.on('hover:enter', function () {
+        Lampa.Controller.back();
+      });
+    }
+
     var enabled = mk('Фильтр');
     function refreshEnabled() {
       if (main) enabled.set((config.enabled ? 'вкл' : 'выкл') + timerLeftText());
@@ -463,35 +506,38 @@
       refreshKeep();
     });
 
-    section('Исключить жанры (любое вхождение = карточка скрыта)');
+    section('Жанры');
 
-    GENRES.forEach(function (genre) {
-      var row = mk(genre.title + ' (' + genre.id + ')');
+    function genrePickerRow(name, list) {
+      var row = mk(name);
       function refresh() {
-        row.set((rules.exclude_genres || []).indexOf(genre.id) !== -1 ? '✓' : '—');
+        row.set(list.length ? 'выбрано ' + list.length : 'нет');
       }
       refresh();
       row.el.on('hover:enter', function () {
-        toggleIn(rules.exclude_genres, genre.id);
-        commit();
-        refresh();
+        Lampa.Select.show({
+          title: name,
+          items: GENRES.map(function (genre) {
+            return {
+              id: genre.id,
+              title: genre.title + ' (' + genre.id + ')',
+              checkbox: true,
+              checked: list.indexOf(genre.id) !== -1
+            };
+          }),
+          onCheck: function (element) {
+            var index = list.indexOf(element.id);
+            if (element.checked && index === -1) list.push(element.id);
+            if (!element.checked && index !== -1) list.splice(index, 1);
+            commit();
+            refresh();
+          }
+        });
       });
-    });
+    }
 
-    section('Только жанры (хотя бы один; пусто = любые)');
-
-    GENRES.forEach(function (genre) {
-      var row = mk(genre.title + ' (' + genre.id + ')');
-      function refresh() {
-        row.set((rules.include_genres || []).indexOf(genre.id) !== -1 ? '✓' : '—');
-      }
-      refresh();
-      row.el.on('hover:enter', function () {
-        toggleIn(rules.include_genres, genre.id);
-        commit();
-        refresh();
-      });
-    });
+    genrePickerRow('Исключить жанры (любое вхождение = скрыть)', rules.exclude_genres);
+    genrePickerRow('Только жанры (хотя бы один; пусто = любые)', rules.include_genres);
   }
 
   function hookSettings() {
