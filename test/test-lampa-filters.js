@@ -26,16 +26,23 @@ function makeEnv(storageInitial) {
     { title: 'Старый-2017', vote_average: 8.0, vote_count: 100, release_quality: '4K', genre_ids: [28], release_date: '2017-03-03' }
   ];
   const env = { fixtures, storage, listeners };
+  const jQuery = function () {
+    return { append: () => {}, on: () => {}, parent: () => ({ length: 1 }), detach: () => {}, remove: () => {}, children: () => ({ last: () => ({}) }) };
+  };
   const Lampa = {
     Storage: storage,
     SettingsApi: { addComponent: () => {} },
     Settings: { listener: { follow: () => {} } },
     Favorite: { get: () => fixtures.slice() },
     Select: { show: () => {} },
-    Listener: { follow: (name, cb) => { (listeners[name] = listeners[name] || []).push(cb); } }
+    Listener: { follow: (name, cb) => { (listeners[name] = listeners[name] || []).push(cb); } },
+    Controller: { add: () => {}, toggle: () => {}, back: () => {}, collectionSet: () => {}, collectionFocus: () => {} },
+    Activity: { active: () => ({ component: 'test' }), refresh: () => {} }
   };
   global.window = global;
   global.Lampa = Lampa;
+  global.$ = jQuery;
+  global.jQuery = jQuery;
   env.Lampa = Lampa;
   return env;
 }

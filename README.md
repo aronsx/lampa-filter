@@ -7,7 +7,7 @@ Client-side content filters for [Lampa](https://lampa.mx): digital releases, cat
 ## What it does
 
 - Filters every list response that flows through the app network layer via the official `request_secuses` hook: digital releases, catalog, main page rows, top-100, collections, recommendations. Cached responses are filtered too. Search results are never filtered.
-- Separate rule set for Favorites (favorites are stored on the device, so the plugin filters them locally).
+- Separate rule set for Favorites (favorites are stored on the device, so the plugin filters them locally). On any Favorites screen a floating button opens a right-side drawer with the favorites-only filter; closing the drawer refreshes the list immediately. The same rules are also editable in the plugin settings screen.
 - Criteria:
   - min rating with source choice: `auto` (TMDB when the item has 10+ votes, IMDb otherwise), TMDB only, IMDb only
   - year range (from / to)

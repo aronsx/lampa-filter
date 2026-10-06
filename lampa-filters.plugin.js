@@ -48,6 +48,83 @@
 
   var config = loadConfig();
 
+  var DRAWER_CSS = [
+    '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:998;padding:10px 18px;background:#2d6cdf;color:#fff;border-radius:24px;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}',
+    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:92vw;background:#1d1f20;z-index:999;box-shadow:-6px 0 24px rgba(0,0,0,.5);overflow-y:auto;padding-bottom:24px}',
+    '.lampa-filters-drawer__head{padding:18px 20px 10px;font-size:16px;color:#fff;font-weight:600}',
+    '.lampa-filters-drawer__done{margin:0 20px 10px;padding:10px;background:#2d6cdf;color:#fff;border-radius:8px;text-align:center;cursor:pointer}',
+    '.lampa-filters-drawer .settings-param{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;cursor:pointer}',
+    '.lampa-filters-drawer .settings-param:hover,.lampa-filters-drawer .settings-param.focus{background:#26282c}',
+    '.lampa-filters-drawer .settings-param__name{font-size:14px;color:#ddd}',
+    '.lampa-filters-drawer .settings-param__value{font-size:13px;color:#9cdcfe;max-width:45%;text-align:right}',
+    '.lampa-filters-drawer .settings-param-title{padding:16px 20px 6px;font-size:12px;color:#888;text-transform:uppercase}'
+  ].join('');
+
+  var drawer = null;
+  var drawerToggled = false;
+  var fab = null;
+
+  function ensureFab() {
+    if (!fab) {
+      fab = $('<div class="selector lampa-filters-fab">Фильтр избранного</div>');
+      fab.on('hover:enter', toggleDrawer);
+    }
+    if (!fab.parent().length) $('body').append(fab);
+  }
+
+  function removeFab() {
+    if (fab) fab.detach();
+  }
+
+  function toggleDrawer() {
+    if (drawer) closeDrawer();
+    else openDrawer();
+  }
+
+  function openDrawer() {
+    if (drawer) return;
+    drawer = $('<div class="lampa-filters-drawer"></div>');
+    drawer.append('<div class="lampa-filters-drawer__head">Фильтр избранного</div>');
+    var done = $('<div class="selector lampa-filters-drawer__done">Готово</div>');
+    done.on('hover:enter', closeDrawer);
+    drawer.append(done);
+    var body = $('<div></div>');
+    drawer.append(body);
+    addFilterControls(body, config.favorites, false);
+    $('body').append(drawer);
+    Lampa.Controller.add('lampa_filters_drawer', {
+      toggle: function () {
+        drawerToggled = true;
+        Lampa.Controller.collectionSet(drawer);
+        Lampa.Controller.collectionFocus(false, drawer);
+      },
+      up: function () { Navigator.move('up'); },
+      down: function () { Navigator.move('down'); },
+      back: closeDrawer
+    });
+    Lampa.Controller.toggle('lampa_filters_drawer');
+  }
+
+  function closeDrawer() {
+    if (!drawer) return;
+    drawer.remove();
+    drawer = null;
+    if (drawerToggled) {
+      drawerToggled = false;
+      Lampa.Controller.back();
+    }
+    var active = Lampa.Activity.active();
+    if (active && active.component === 'favorite') Lampa.Activity.refresh();
+  }
+
+  function hookFavoritesScreen() {
+    Lampa.Listener.follow('activity', function (event) {
+      if (event.component !== 'favorite') return;
+      if (event.type === 'destroy') removeFab();
+      else ensureFab();
+    });
+  }
+
   function loadConfig() {
     var saved = {};
     try { saved = Lampa.Storage.get(STORAGE_KEY, '{}') || {}; } catch (error) { saved = {}; }
@@ -412,9 +489,11 @@
       config.enabled_at = Date.now();
       saveConfig();
     }
+    $('head').append('<style>' + DRAWER_CSS + '</style>');
     hookRequests();
     hookFavorite();
     hookSettings();
+    hookFavoritesScreen();
     if (listsActive()) {
       console.log('%c[lampa-filters] активен: ' + summary(), 'color:#0a0;font-weight:bold');
     } else {
