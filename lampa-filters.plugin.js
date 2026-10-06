@@ -49,15 +49,12 @@
   var config = loadConfig();
 
   var DRAWER_CSS = [
-    '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:998;padding:10px 18px;background:#2d6cdf;color:#fff;border-radius:24px;font-size:14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)}',
-    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:92vw;background:#1d1f20;z-index:999;box-shadow:-6px 0 24px rgba(0,0,0,.5);overflow-y:auto;padding-bottom:24px}',
-    '.lampa-filters-drawer__head{padding:18px 20px 10px;font-size:16px;color:#fff;font-weight:600}',
-    '.lampa-filters-drawer__done{margin:0 20px 10px;padding:10px;background:#2d6cdf;color:#fff;border-radius:8px;text-align:center;cursor:pointer}',
-    '.lampa-filters-drawer .settings-param{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;cursor:pointer}',
-    '.lampa-filters-drawer .settings-param:hover,.lampa-filters-drawer .settings-param.focus{background:#26282c}',
-    '.lampa-filters-drawer .settings-param__name{font-size:14px;color:#ddd}',
-    '.lampa-filters-drawer .settings-param__value{font-size:13px;color:#9cdcfe;max-width:45%;text-align:right}',
-    '.lampa-filters-drawer .settings-param-title{padding:16px 20px 6px;font-size:12px;color:#888;text-transform:uppercase}'
+    '.lampa-filters-list{width:100%}',
+    '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:998}',
+    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:92vw;background:#1d1f20;z-index:999;box-shadow:-6px 0 24px rgba(0,0,0,.5);overflow-y:auto;padding-bottom:24px}',
+    '.lampa-filters-drawer__head{padding:18px 20px 4px;font-size:16px;color:#fff;font-weight:600}',
+    '.lampa-filters-drawer .settings-param:first-of-type{margin-top:8px}',
+    '.lampa-filters-drawer__done{margin:12px 20px}'
   ].join('');
 
   var drawer = null;
@@ -66,7 +63,7 @@
 
   function ensureFab() {
     if (!fab) {
-      fab = $('<div class="selector lampa-filters-fab">Фильтр избранного</div>');
+      fab = $('<div class="simple-button selector lampa-filters-fab">Фильтр избранного</div>');
       fab.on('hover:enter', toggleDrawer);
     }
     if (!fab.parent().length) $('body').append(fab);
@@ -85,7 +82,7 @@
     if (drawer) return;
     drawer = $('<div class="lampa-filters-drawer"></div>');
     drawer.append('<div class="lampa-filters-drawer__head">Фильтр избранного</div>');
-    var done = $('<div class="selector lampa-filters-drawer__done">Готово</div>');
+    var done = $('<div class="simple-button selector lampa-filters-drawer__done">Готово</div>');
     done.on('hover:enter', closeDrawer);
     drawer.append(done);
     var body = $('<div></div>');
@@ -243,6 +240,39 @@
     });
   }
 
+  var reliseNextUpstream = 1;
+
+  function hookRelise() {
+    if (!Lampa.Api || !Lampa.Api.relise) return;
+    var orig = Lampa.Api.relise;
+    Lampa.Api.relise = function (params, oncomplite, onerror) {
+      var requested = (params && params.page) || 1;
+      if (requested <= 1) reliseNextUpstream = 1;
+      var page = reliseNextUpstream;
+      var collected = [];
+      var tries = 0;
+      var maxTries = 7;
+      function next() {
+        tries++;
+        orig({ page: page }, function (data) {
+          (data.results || []).forEach(function (item) {
+            collected.push(item);
+          });
+          page++;
+          var lastUpstream = data.total_pages && (page - 1) >= data.total_pages;
+          if (collected.length >= 20 || lastUpstream || tries >= maxTries) {
+            reliseNextUpstream = page;
+            data.results = collected;
+            oncomplite(data);
+          } else {
+            next();
+          }
+        }, onerror);
+      }
+      next();
+    };
+  }
+
   function hookFavorite() {
     var orig = Lampa.Favorite.get;
     Lampa.Favorite.get = function () {
@@ -262,8 +292,8 @@
       items: options.map(function (option) {
         return { title: option.title, selected: option.value === current, __value: option.value };
       }),
-      onSelect: function (a, item) {
-        if (item) onSelect(item.__value);
+      onSelect: function (element) {
+        onSelect(element.__value);
       }
     });
   }
@@ -319,6 +349,15 @@
       if (index === -1) list.push(value); else list.splice(index, 1);
     }
 
+    function commit() {
+      if (!rules.enabled) {
+        rules.enabled = true;
+        if (main) rules.enabled_at = Date.now();
+      }
+      saveConfig();
+      refreshEnabled();
+    }
+
     var enabled = mk('Фильтр');
     function refreshEnabled() {
       if (main) enabled.set((config.enabled ? 'вкл' : 'выкл') + timerLeftText());
@@ -358,7 +397,7 @@
     rating.el.on('hover:enter', function () {
       choose('Рейтинг от', ratingOptions(), rules.rating_min, function (value) {
         rules.rating_min = value;
-        saveConfig();
+        commit();
         refreshRating();
       });
     });
@@ -371,7 +410,7 @@
     source.el.on('hover:enter', function () {
       choose('Источник рейтинга', sourceOptions(), rules.rating_source, function (value) {
         rules.rating_source = value;
-        saveConfig();
+        commit();
         refreshSource();
       });
     });
@@ -386,14 +425,14 @@
     yearFrom.el.on('hover:enter', function () {
       choose('Год от', yearOptions(), rules.year_from, function (value) {
         rules.year_from = value;
-        saveConfig();
+        commit();
         refreshYears();
       });
     });
     yearTo.el.on('hover:enter', function () {
       choose('Год по', yearOptions(), rules.year_to, function (value) {
         rules.year_to = value;
-        saveConfig();
+        commit();
         refreshYears();
       });
     });
@@ -408,7 +447,7 @@
       refresh();
       row.el.on('hover:enter', function () {
         toggleIn(rules.quality, quality.code);
-        saveConfig();
+        commit();
         refresh();
       });
     });
@@ -420,7 +459,7 @@
     refreshKeep();
     keepUnknown.el.on('hover:enter', function () {
       rules.keep_unknown_quality = !rules.keep_unknown_quality;
-      saveConfig();
+      commit();
       refreshKeep();
     });
 
@@ -434,7 +473,7 @@
       refresh();
       row.el.on('hover:enter', function () {
         toggleIn(rules.exclude_genres, genre.id);
-        saveConfig();
+        commit();
         refresh();
       });
     });
@@ -449,7 +488,7 @@
       refresh();
       row.el.on('hover:enter', function () {
         toggleIn(rules.include_genres, genre.id);
-        saveConfig();
+        commit();
         refresh();
       });
     });
@@ -466,10 +505,12 @@
       if (event.name !== 'lampa_filters') return;
       var body = event.body;
       body.empty();
-      body.append('<div class="settings-param-title"><span>Подборки (релизы, каталог, главная, топ, коллекции)</span></div>');
-      addFilterControls(body, config, true);
-      body.append('<div class="settings-param-title"><span>Избранное (отдельные правила)</span></div>');
-      addFilterControls(body, config.favorites, false);
+      var list = $('<div class="lampa-filters-list"></div>');
+      body.append(list);
+      list.append('<div class="settings-param-title"><span>Подборки (релизы, каталог, главная, топ, коллекции)</span></div>');
+      addFilterControls(list, config, true);
+      list.append('<div class="settings-param-title"><span>Избранное (отдельные правила)</span></div>');
+      addFilterControls(list, config.favorites, false);
     });
   }
 
@@ -491,6 +532,7 @@
     }
     $('head').append('<style>' + DRAWER_CSS + '</style>');
     hookRequests();
+    hookRelise();
     hookFavorite();
     hookSettings();
     hookFavoritesScreen();
@@ -503,7 +545,7 @@
   }
 
   (function wait() {
-    if (window.Lampa && Lampa.SettingsApi && Lampa.Favorite && Lampa.Select && Lampa.Listener) start();
+    if (window.Lampa && Lampa.SettingsApi && Lampa.Api && Lampa.Favorite && Lampa.Select && Lampa.Listener) start();
     else setTimeout(wait, 50);
   })();
 })();

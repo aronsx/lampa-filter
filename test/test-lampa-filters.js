@@ -25,7 +25,7 @@ function makeEnv(storageInitial) {
     { title: 'Персона', popularity: 12.0 },
     { title: 'Старый-2017', vote_average: 8.0, vote_count: 100, release_quality: '4K', genre_ids: [28], release_date: '2017-03-03' }
   ];
-  const env = { fixtures, storage, listeners };
+  const env = { fixtures, storage, listeners, reliseCalls: [] };
   const jQuery = function () {
     return { append: () => {}, on: () => {}, parent: () => ({ length: 1 }), detach: () => {}, remove: () => {}, children: () => ({ last: () => ({}) }) };
   };
@@ -37,7 +37,16 @@ function makeEnv(storageInitial) {
     Select: { show: () => {} },
     Listener: { follow: (name, cb) => { (listeners[name] = listeners[name] || []).push(cb); } },
     Controller: { add: () => {}, toggle: () => {}, back: () => {}, collectionSet: () => {}, collectionFocus: () => {} },
-    Activity: { active: () => ({ component: 'test' }), refresh: () => {} }
+    Activity: { active: () => ({ component: 'test' }), refresh: () => {} },
+    Api: {
+      relise: (params, cb) => {
+        env.reliseCalls.push(params.page);
+        const page = params.page;
+        cb(page <= 5
+          ? { results: [{ title: 'p' + page + 'a' }, { title: 'p' + page + 'b' }], page: page, total_pages: 5 }
+          : { results: [], page: page, total_pages: 5 });
+      }
+    }
   };
   global.window = global;
   global.Lampa = Lampa;
@@ -103,6 +112,19 @@ function deliver(env, url) {
 
   const fav = env.Lampa.Favorite.get();
   check('favorites off: everything stays', fav.length === env.fixtures.length);
+}
+
+{
+  const env = makeEnv({});
+  loadPlugin();
+
+  let result = null;
+  env.Lampa.Api.relise({ page: 1 }, (data) => { result = data; });
+  check('relise accumulates until upstream end (5 pages x 2 = 10)', result.results.length === 10 && env.reliseCalls.length === 5);
+
+  env.reliseCalls.length = 0;
+  env.Lampa.Api.relise({ page: 2 }, (data) => { result = data; });
+  check('relise next displayed page resumes after consumed upstream', env.reliseCalls[0] === 6 && result.results.length === 0);
 }
 
 console.log('\nитог: ' + passed + ' проверок пройдено');
