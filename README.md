@@ -6,7 +6,7 @@ Client-side content filters for [Lampa](https://lampa.mx): digital releases, cat
 
 ## What it does
 
-- Filters every list response that flows through the app network layer: digital releases, catalog, main page rows, top-100, collections, recommendations. Search results are never filtered.
+- Filters every list response that flows through the app network layer via the official `request_secuses` hook: digital releases, catalog, main page rows, top-100, collections, recommendations. Cached responses are filtered too. Search results are never filtered.
 - Separate rule set for Favorites (favorites are stored on the device, so the plugin filters them locally).
 - Criteria:
   - min rating with source choice: `auto` (TMDB when the item has 10+ votes, IMDb otherwise), TMDB only, IMDb only
@@ -43,7 +43,6 @@ make test        # or: node test/test-lampa-filters.js
 
 ## Notes and limitations
 
-- Lampa caches list responses for up to a couple of days. Right after install some rows may show unfiltered cached data. Fix once: disable request caching in Lampa settings or clear site data.
 - Filtered pages are shorter (20 -> K items) and almost never empty.
 - Quality data (`webdl`/`4K`/`ts`) is present only on lists enriched by the cub backend; other lists rely on the "keep unknown quality" rule.
 - Pages are filtered in place; no pagination refilling.

@@ -146,34 +146,24 @@
     return true;
   }
 
-  function hookAjax() {
-    if (!window.jQuery || !jQuery.ajax || jQuery.ajax.__lampaFilters) return;
-    var orig = jQuery.ajax;
-    var wrapped = function (settings) {
-      if (settings && typeof settings === 'object' && typeof settings.success === 'function' && settings.url) {
-        var url = settings.url;
-        var userSuccess = settings.success;
-        settings = jQuery.extend({}, settings, {
-          success: function (data) {
-            try {
-              if (listsActive() && data && typeof data === 'object' && Array.isArray(data.results) &&
-                  data.results.length && url.indexOf('/search/') === -1) {
-                var before = data.results.length;
-                data.results = data.results.filter(function (item) { return pass(item, config); });
-                var dropped = before - data.results.length;
-                if (dropped) console.log('[lampa-filters] ' + url.slice(0, 80) + ' : отсеяно ' + dropped + ' из ' + before);
-              }
-            } catch (error) {
-              console.warn('[lampa-filters]', error);
-            }
-            return userSuccess.apply(this, arguments);
-          }
-        });
+  function hookRequests() {
+    Lampa.Listener.follow('request_secuses', function (event) {
+      try {
+        var data = event.data;
+        if (!listsActive() || !data || typeof data !== 'object') return;
+        if (!Array.isArray(data.results) || !data.results.length) return;
+        var url = (event.params && event.params.url) || '';
+        if (url.indexOf('/search/') !== -1) return;
+        var before = data.results.length;
+        var filtered = data.results.filter(function (item) { return pass(item, config); });
+        if (filtered.length !== before) {
+          data.results = filtered;
+          console.log('[lampa-filters] ' + url.slice(0, 80) + ' : отсеяно ' + (before - filtered.length) + ' из ' + before);
+        }
+      } catch (error) {
+        console.warn('[lampa-filters]', error);
       }
-      return orig.call(jQuery, settings);
-    };
-    wrapped.__lampaFilters = true;
-    jQuery.ajax = wrapped;
+    });
   }
 
   function hookFavorite() {
@@ -422,7 +412,7 @@
       config.enabled_at = Date.now();
       saveConfig();
     }
-    hookAjax();
+    hookRequests();
     hookFavorite();
     hookSettings();
     if (listsActive()) {
@@ -434,7 +424,7 @@
   }
 
   (function wait() {
-    if (window.Lampa && Lampa.SettingsApi && Lampa.Favorite && Lampa.Select && window.jQuery) start();
+    if (window.Lampa && Lampa.SettingsApi && Lampa.Favorite && Lampa.Select && Lampa.Listener) start();
     else setTimeout(wait, 50);
   })();
 })();
