@@ -66,7 +66,7 @@
 
   function ensureFab() {
     if (!fab) {
-      fab = $('<div class="lampa-filters-fab"><div class="simple-button selector">Фильтр избранного</div></div>');
+      fab = $('<div class="lampa-filters-fab"><div class="simple-button selector">Фильтр</div></div>');
       fab.on('hover:enter', toggleDrawer);
     }
     if (!fab.parent().length) $('body').append(fab);
@@ -169,6 +169,7 @@
     if (!fab || !fab.parent().length) return;
     var anchor = secondRowStartCard();
     if (!anchor) return;
+    fabPlaced = true;
     var fabRect = fab[0].getBoundingClientRect();
     fab.css({
       left: Math.round(anchor.left + anchor.width / 2 - fabRect.width / 2) + 'px',
@@ -177,12 +178,16 @@
     });
   }
 
+  var fabPlaced = false;
+
   function watchFabPosition() {
     if (typeof document === 'undefined') return;
     setInterval(function () {
-      if (onFavoritesScreen() && fab) placeFab();
-    }, 800);
+      if (!onFavoritesScreen() || !fab || fabPlaced) return;
+      placeFab();
+    }, 500);
     $(window).on('resize', function () {
+      fabPlaced = false;
       if (onFavoritesScreen() && fab) placeFab();
     });
   }
@@ -261,7 +266,10 @@
         return;
       }
       if (event.type === 'destroy') removeFab();
-      else ensureFab();
+      else {
+        ensureFab();
+        fabPlaced = false;
+      }
     });
   }
 
@@ -548,6 +556,13 @@
       body.append($('<div class="settings-param selector" data-static="true"></div>')
         .append('<div class="settings-param__name">' + name + '</div>').append(value));
       var el = body.children().last();
+      el.on('hover:focus', function (event) {
+        try {
+          if (event.target && event.target.scrollIntoView) {
+            event.target.scrollIntoView({ block: 'nearest' });
+          }
+        } catch (error) {}
+      });
       return {
         el: el,
         set: function (text) { value.text(text); }
