@@ -25,7 +25,7 @@ function makeEnv(storageInitial) {
     { title: 'Персона', popularity: 12.0 },
     { title: 'Старый-2017', vote_average: 8.0, vote_count: 100, release_quality: '4K', genre_ids: [28], release_date: '2017-03-03' }
   ];
-  const env = { fixtures, storage, listeners, reliseCalls: [] };
+  const env = { fixtures, storage, listeners, reliseCalls: [], requests: [], refreshed: 0 };
   const jQuery = function () {
     return { append: () => {}, on: () => {}, parent: () => ({ length: 1 }), detach: () => {}, remove: () => {}, children: () => ({ last: () => ({}) }) };
   };
@@ -37,7 +37,11 @@ function makeEnv(storageInitial) {
     Select: { show: () => {} },
     Listener: { follow: (name, cb) => { (listeners[name] = listeners[name] || []).push(cb); } },
     Controller: { add: () => {}, toggle: () => {}, back: () => {}, collectionSet: () => {}, collectionFocus: () => {} },
-    Activity: { active: () => ({ component: 'test' }), refresh: () => {} },
+    Activity: { active: () => ({ component: 'test' }), refresh: () => { env.refreshed++; } },
+    TMDB: { key: () => 'testkey', api: (u) => 'https://test.example/3/' + u },
+    Reguest: function () {
+      return { silent: (url, ok) => { env.requests.push({ url: url, ok: ok }); }, clear: () => {}, timeout: () => {} };
+    },
     Api: {
       relise: (params, cb) => {
         env.reliseCalls.push(params.page);
@@ -125,6 +129,22 @@ function deliver(env, url) {
   env.reliseCalls.length = 0;
   env.Lampa.Api.relise({ page: 2 }, (data) => { result = data; });
   check('relise next displayed page resumes after consumed upstream', env.reliseCalls[0] === 6 && result.results.length === 0);
+}
+
+{
+  const env = makeEnv({ lampa_filters: { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, quality: [], year_from: 2018, year_to: null, exclude_genres: [27], favorites: { enabled: true, rating_min: 0, quality: [], exclude_genres: [27], include_genres: [], keep_unknown_quality: true } } });
+  env.fixtures.push({ title: 'Астрал', vote_average: 6.9, id: 555, release_date: '2018-06-01' });
+  loadPlugin();
+
+  let fav = env.Lampa.Favorite.get();
+  check('астрал без жанров: остаётся до уточнения', fav.some(r => r.title === 'Астрал') && env.requests.length === 1 && /movie\/555/.test(env.requests[0].url));
+
+  env.requests[0].ok({ genres: [{ id: 27, name: 'ужасы' }] });
+  check('жанры уточнены и закэшированы', env.storage.dump().lampa_filters_genres['555'][0] === 27);
+  check('экран обновился после уточнения', env.refreshed > 0);
+
+  fav = env.Lampa.Favorite.get();
+  check('астрал отсеян по жанру из кэша', !fav.some(r => r.title === 'Астрал'));
 }
 
 console.log('\nитог: ' + passed + ' проверок пройдено');

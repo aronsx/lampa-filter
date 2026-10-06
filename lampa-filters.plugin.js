@@ -56,7 +56,7 @@
     '.lampa-filters-drawer__head{padding:18px 20px 4px;font-size:16px;color:#fff;font-weight:600}',
     '.lampa-filters-drawer .settings-param:first-of-type{margin-top:8px}',
     '.lampa-filters-drawer__done{margin:12px 20px}',
-    '.lampa-filters-screen-btn{border-bottom:1px solid #232427}'
+    '.lampa-filters-screen-btn .lampa-filters-screen-btn__title{display:flex;align-items:center;justify-content:center;height:100%;text-align:center;color:#9cdcfe;font-size:1.1em;padding:0.5em}'
   ].join('');
 
   var drawer = null;
@@ -129,19 +129,20 @@
     }
   }
 
+  var screenObserver = null;
+
   function injectScreenButton(event) {
     try {
       var object = event.object;
       var html = object && object.activity && object.activity.render ? object.activity.render() : null;
       if (!html || !html.find) return;
-      var target = html.find('.scroll__body').first();
-      if (!target.length) target = html.find('.scroll__content').first();
-      if (!target.length || target.find('.lampa-filters-screen-btn').length) return;
-      var btn = $('<div class="settings-param selector lampa-filters-screen-btn">' +
-        '<div class="settings-param__name">Фильтр избранного</div>' +
-        '<div class="settings-param__value">настроить</div></div>');
+      if (html.find('.lampa-filters-screen-btn').length) return;
+      var firstCard = html.find('.card').first();
+      if (!firstCard.length) return;
+      var btn = $('<div class="card selector lampa-filters-screen-btn"><div class="lampa-filters-screen-btn__title">Фильтр избранного</div></div>');
       btn.on('hover:enter', openDrawer);
-      target.prepend(btn);
+      firstCard.before(btn);
+      console.log('[lampa-filters] кнопка фильтра добавлена на экран избранного');
     } catch (error) {
       console.warn('[lampa-filters]', error);
     }
@@ -149,11 +150,32 @@
 
   function hookFavoritesScreen() {
     Lampa.Listener.follow('activity', function (event) {
-      if (event.component !== 'favorite') return;
-      if (event.type === 'destroy') removeFab();
-      else {
-        ensureFab();
-        injectScreenButton(event);
+      if (event.component !== 'favorite') {
+        if (screenObserver) {
+          screenObserver.disconnect();
+          screenObserver = null;
+        }
+        removeFab();
+        return;
+      }
+      if (event.type === 'destroy') {
+        removeFab();
+        if (screenObserver) {
+          screenObserver.disconnect();
+          screenObserver = null;
+        }
+        return;
+      }
+      ensureFab();
+      injectScreenButton(event);
+      if (!screenObserver) {
+        try {
+          var html = event.object.activity.render();
+          screenObserver = new MutationObserver(function () {
+            injectScreenButton(event);
+          });
+          screenObserver.observe(html[0], { childList: true, subtree: true });
+        } catch (error) {}
       }
     });
   }
@@ -196,11 +218,23 @@
     return true;
   }
 
+  var genreCache = Lampa.Storage.get('lampa_filters_genres', '{}') || {};
+
+  function cacheGenres(id, ids) {
+    genreCache[id] = ids;
+    Lampa.Storage.set('lampa_filters_genres', genreCache);
+  }
+
   function genreIds(item) {
     var ids = (item.genre_ids || []).slice();
     (item.genres || []).forEach(function (genre) {
       if (ids.indexOf(genre.id) === -1) ids.push(genre.id);
     });
+    if (!ids.length && item.id in genreCache) {
+      (genreCache[item.id] || []).forEach(function (id) {
+        ids.push(id);
+      });
+    }
     return ids;
   }
 
@@ -309,14 +343,73 @@
     };
   }
 
+  var genrePending = {};
+
+  function enrichGenres(items) {
+    var need = items.filter(needsEnrich);
+    if (!need.length || !Lampa.TMDB || !Lampa.Reguest) return;
+    need.forEach(enrichItem);
+  }
+
+  function needsEnrich(item) {
+    return looksLikeContent(item) && !genreIds(item).length && item.id &&
+      !(item.id in genreCache) && !genrePending[item.id];
+  }
+
+  function enrichItem(item) {
+    genrePending[item.id] = true;
+    var isTv = !item.release_date && (item.first_air_date || item.name);
+    var url = Lampa.TMDB.api((isTv ? 'tv/' : 'movie/') + item.id + '?api_key=' + Lampa.TMDB.key() + '&language=ru');
+    var network = new Lampa.Reguest();
+    network.silent(url, function (data) {
+      if (data && Array.isArray(data.genres) && data.genres.length) {
+        cacheGenres(item.id, data.genres.map(function (genre) { return genre.id; }));
+        delete genrePending[item.id];
+        afterEnrich();
+      } else {
+        fallbackFind(item);
+      }
+    }, function () {
+      fallbackFind(item);
+    });
+  }
+
+  function fallbackFind(item) {
+    var finish = function (ids) {
+      cacheGenres(item.id, ids || []);
+      delete genrePending[item.id];
+      afterEnrich();
+    };
+    if (!item.imdb_id) return finish([]);
+    var url = Lampa.TMDB.api('find/' + item.imdb_id + '?external_source=imdb_id&api_key=' + Lampa.TMDB.key() + '&language=ru');
+    new Lampa.Reguest().silent(url, function (data) {
+      var first = (data.movie_results && data.movie_results[0]) || (data.tv_results && data.tv_results[0]);
+      finish(first && Array.isArray(first.genre_ids) ? first.genre_ids : []);
+    }, function () {
+      finish([]);
+    });
+  }
+
+  function afterEnrich() {
+    if (Object.keys(genrePending).length === 0) {
+      console.log('[lampa-filters] жанры избранного получены, обновляю экран');
+      Lampa.Activity.refresh();
+    }
+  }
+
   function hookFavorite() {
     var orig = Lampa.Favorite.get;
     Lampa.Favorite.get = function () {
       var res = orig.apply(this, arguments);
       if (Array.isArray(res) && config.favorites.enabled) {
+        var unknown = res.filter(needsEnrich);
+        if (unknown.length) enrichGenres(unknown);
         var before = res.length;
-        res = res.filter(function (item) { return pass(item, config.favorites); });
-        if (res.length !== before) console.log('[lampa-filters] избранное: ' + before + ' -> ' + res.length);
+        res = res.filter(function (item) {
+          if (needsEnrich(item)) return true;
+          return pass(item, config.favorites);
+        });
+        if (res.length !== before || unknown.length) console.log('[lampa-filters] избранное: ' + before + ' -> ' + res.length + ' (жанры уточняются: ' + unknown.length + ')');
       }
       return res;
     };
