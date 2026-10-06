@@ -136,11 +136,55 @@
     return active && active.component === 'favorite';
   }
 
-  function favoritesFirstCard() {
+  function favoritesCards() {
     var active = Lampa.Activity.active();
     var html = active && active.activity && active.activity.render ? active.activity.render() : null;
-    if (!html || !html.find) return $();
-    return html.find('.card').not('.lampa-filters-fab .card').first();
+    if (!html || !html.find) return [];
+    return html.find('.card').toArray();
+  }
+
+  function favoritesFirstCard() {
+    var cards = favoritesCards();
+    return cards.length ? $(cards[0]) : $();
+  }
+
+  function secondRowStartCard() {
+    var cards = favoritesCards().map(function (element) {
+      var rect = element.getBoundingClientRect();
+      return { element: element, top: rect.top, left: rect.left, width: rect.width };
+    }).filter(function (item) {
+      return item.width > 0;
+    });
+    if (!cards.length) return null;
+    var minTop = Math.min.apply(null, cards.map(function (item) { return item.top; }));
+    var firstRow = cards.filter(function (item) {
+      return Math.abs(item.top - minTop) < 12;
+    }).sort(function (a, b) {
+      return a.left - b.left;
+    });
+    return firstRow.length > 1 ? firstRow[1] : firstRow[0];
+  }
+
+  function placeFab() {
+    if (!fab || !fab.parent().length) return;
+    var anchor = secondRowStartCard();
+    if (!anchor) return;
+    var fabRect = fab[0].getBoundingClientRect();
+    fab.css({
+      left: Math.round(anchor.left + anchor.width / 2 - fabRect.width / 2) + 'px',
+      top: Math.round(anchor.top - fabRect.height - 12) + 'px',
+      bottom: 'auto'
+    });
+  }
+
+  function watchFabPosition() {
+    if (typeof document === 'undefined') return;
+    setInterval(function () {
+      if (onFavoritesScreen() && fab) placeFab();
+    }, 800);
+    $(window).on('resize', function () {
+      if (onFavoritesScreen() && fab) placeFab();
+    });
   }
 
   function focusedElement() {
@@ -717,6 +761,7 @@
     hookSettings();
     hookFavoritesScreen();
     hookNavigation();
+    watchFabPosition();
     if (listsActive()) {
       console.log('%c[lampa-filters] активен: ' + summary(), 'color:#0a0;font-weight:bold');
     } else {
