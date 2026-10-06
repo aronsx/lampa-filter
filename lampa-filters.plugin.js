@@ -173,7 +173,7 @@
     var fabRect = fab[0].getBoundingClientRect();
     fab.css({
       left: Math.round(anchor.left + anchor.width / 2 - fabRect.width / 2) + 'px',
-      top: Math.round(anchor.top - fabRect.height - 12) + 'px',
+      top: Math.round(anchor.top - fabRect.height - 32) + 'px',
       bottom: 'auto'
     });
   }
