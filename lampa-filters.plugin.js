@@ -50,8 +50,7 @@
 
   var DRAWER_CSS = [
     '.lampa-filters-list{width:100%}',
-    '.lampa-filters-fab{position:fixed;top:5.5em;left:2em;right:2em;z-index:40;display:flex;justify-content:center}',
-    '.lampa-filters-fab .simple-button{padding:0.8em 2em}',
+    '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:40}',
     '.lampa-filters-fab .simple-button.focus,.lampa-filters-fab .simple-button:hover{outline:2px solid #fff}',
     '.lampa-filters-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:49}',
     '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:92vw;background:#1d1f20;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5);overflow-y:auto;padding-bottom:24px}',
@@ -144,17 +143,23 @@
     return html.find('.card').not('.lampa-filters-fab .card').first();
   }
 
+  function focusedElement() {
+    try {
+      if (window.Navigator && Navigator.getFocusedElement) return Navigator.getFocusedElement();
+    } catch (error) {}
+    return null;
+  }
+
   function firstCardFocused() {
-    if (!window.Navigator || !Navigator.focused) return false;
-    var focused = Navigator.focused();
+    var focused = focusedElement();
     if (!focused) return false;
     var card = favoritesFirstCard();
     return card.length && focused === card[0];
   }
 
   function fabFocused() {
-    if (!window.Navigator || !Navigator.focused || !fab) return false;
-    var focused = Navigator.focused();
+    if (!fab) return false;
+    var focused = focusedElement();
     var button = fab.find('.simple-button');
     return button.length && focused === button[0];
   }
