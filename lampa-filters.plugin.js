@@ -2,6 +2,7 @@
   'use strict';
 
   var STORAGE_KEY = 'lampa_filters';
+  var VERSION = '2026-10-07.2';
   var CAM_QUALITY = ['ts', 'tc'];
   var QUALITIES = [
     { code: '4k', title: '4K' },
@@ -49,7 +50,7 @@
   var config = loadConfig();
 
   var DRAWER_CSS = [
-    '.lampa-filters-list{width:100%}',
+    '.lampa-filters-list{width:100%;max-height:calc(100vh - 9em);overflow-y:auto;padding-right:0.5em}',
     '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:40}',
     '.lampa-filters-fab .simple-button.focus,.lampa-filters-fab .simple-button:hover{outline:2px solid #fff}',
     '.lampa-filters-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:49}',
@@ -818,7 +819,7 @@
     hookNavigation();
     watchFabPosition();
     if (listsActive()) {
-      console.log('%c[lampa-filters] активен: ' + summary(), 'color:#0a0;font-weight:bold');
+      console.log('%c[lampa-filters] v' + VERSION + ' активен: ' + summary(), 'color:#0a0;font-weight:bold');
     } else {
       console.log('[lampa-filters] фильтр выключен');
     }
