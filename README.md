@@ -13,7 +13,7 @@ Client-side content filters for [Lampa](https://lampa.mx): digital releases, cat
   - year range (from / to)
   - include genres: keep only items with at least one selected genre
   - exclude genres: any hit rejects the item
-  - quality checkboxes: 4K / webdl / bdrip; cam quality (`ts`/`tc`) is always rejected
+  - quality checkboxes: 4K / webdl / bdrip; cam quality (`ts`/`tc`) is rejected by default and individually toggleable
   - items without quality data are kept (configurable)
 - Auto-off timer (1/3/6/12/24 hours, default 12) so a forgotten filter resets itself.
 

@@ -153,7 +153,7 @@ function deliver(env, url) {
   const env = makeEnv({ lampa_filters: Object.assign({}, base, { exclude_genres: [27], favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
   loadPlugin();
   const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
-  check('исключающий [27]: хоррор скрыт, остальные на месте (экранка уходит всегда)', !out.results.some(r => r.title === 'Хоррор') && !out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length - 2);
+  check('исключающий [27]: хоррор скрыт, экранка уходит по умолчанию', !out.results.some(r => r.title === 'Хоррор') && !out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length - 2);
 }
 
 {
@@ -184,6 +184,15 @@ function deliver(env, url) {
   loadPlugin();
   const out = deliver(env, 'https://tmdb.cubnotrip.top/?sort=top');
   check('исключающий [27]: ТВ-карточка и жанры-объекты тоже отсеиваются', !out.results.some(r => r.name === 'Сериал-хоррор') && !out.results.some(r => r.title === 'Из-детали'));
+}
+
+{
+  const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [], exclude_genres: [] };
+
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { filter_cam: false, favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
+  loadPlugin();
+  const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
+  check('экранка опциональна: при filter_cam=false показывается', out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length);
 }
 
 console.log('\nитог: ' + passed + ' проверок пройдено');

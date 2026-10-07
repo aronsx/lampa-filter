@@ -32,6 +32,7 @@
     year_to: null,
     quality: ['4k', 'webdl', 'bdrip'],
     keep_unknown_quality: true,
+    filter_cam: true,
     include_genres: [],
     exclude_genres: [27],
     favorites: {
@@ -42,6 +43,7 @@
       year_to: null,
       quality: [],
       keep_unknown_quality: true,
+      filter_cam: true,
       include_genres: [],
       exclude_genres: []
     }
@@ -158,7 +160,7 @@
       if (!hit) return false;
     }
     var quality = (item.release_quality || '').toLowerCase();
-    if (CAM_QUALITY.indexOf(quality) !== -1) return false;
+    if (rules.filter_cam !== false && CAM_QUALITY.indexOf(quality) !== -1) return false;
     var allowed = (rules.quality || []).map(function (code) { return code.toLowerCase(); });
     if (allowed.length && quality && allowed.indexOf(quality) === -1) return false;
     if (allowed.length && !quality && !rules.keep_unknown_quality) return false;
@@ -488,7 +490,7 @@
       });
     });
 
-    section('Качество (экранка ts/tc отсеивается всегда)');
+    section('Качество');
 
     QUALITIES.forEach(function (quality) {
       var row = mk(quality.title);
@@ -501,6 +503,17 @@
         commit();
         refresh();
       });
+    });
+
+    var camRow = mk('Экранка (ts/tc) - видео, снятое в кинозале');
+    function refreshCam() {
+      camRow.set(rules.filter_cam !== false ? 'отсекать (рекомендуется)' : 'показывать');
+    }
+    refreshCam();
+    camRow.el.on('hover:enter', function () {
+      rules.filter_cam = rules.filter_cam === false;
+      commit();
+      refreshCam();
     });
 
     var keepUnknown = mk('Пропускать без данных о качестве');
@@ -624,7 +637,7 @@
     if (config.include_genres.length) parts.push('только жанры ' + config.include_genres.join(','));
     if (config.year_from || config.year_to) parts.push('годы ' + (config.year_from || '...') + '-' + (config.year_to || '...'));
     if (config.quality && config.quality.length) parts.push('качество ' + config.quality.join('/'));
-    parts.push('экранка всегда отсеивается');
+    parts.push('экранка ' + (config.filter_cam !== false ? 'отсекается' : 'показывается'));
     return parts.join('; ');
   }
 
