@@ -54,10 +54,13 @@
     '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:40}',
     '.lampa-filters-fab .simple-button.focus,.lampa-filters-fab .simple-button:hover{outline:2px solid #fff}',
     '.lampa-filters-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:49}',
-    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:92vw;background:#1d1f20;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5);overflow-y:auto;padding-bottom:24px}',
-    '.lampa-filters-drawer__head{padding:18px 20px 4px;font-size:16px;color:#fff;font-weight:600}',
-    '.lampa-filters-drawer .settings-param:first-of-type{margin-top:8px}',
-    '.lampa-filters-drawer__done{margin:12px 20px}'
+    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:460px;max-width:92vw;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5)}',
+    '.lampa-filters-drawer .settings{position:relative;width:100%;height:100%}',
+    '.lampa-filters-drawer .settings__content{position:relative;left:auto;top:auto;width:100%;height:100%;transform:none;border-radius:0;transition:none}',
+    '.lampa-filters-drawer .settings__head{padding-bottom:0.6em}',
+    '.lampa-filters-drawer .settings__body{display:block;overflow-y:auto;padding-bottom:2em}',
+    '.lampa-filters-drawer .lampa-filters-list{max-height:none;overflow:visible;padding-right:0}',
+    '.lampa-filters-drawer__done{margin:0.6em 2em 1em}'
   ].join('');
 
   var drawer = null;
@@ -87,14 +90,20 @@
     backdrop = $('<div class="lampa-filters-backdrop"></div>');
     backdrop.on('click', closeDrawer);
     $('body').append(backdrop);
-    drawer = $('<div class="lampa-filters-drawer"></div>');
-    drawer.append('<div class="lampa-filters-drawer__head">Фильтр избранного</div>');
+    drawer = $(
+      '<div class="lampa-filters-drawer">' +
+      '<div class="settings"><div class="settings__content layer--height">' +
+      '<div class="settings__head"><div class="settings__title">Фильтр избранного</div></div>' +
+      '<div class="settings__body"></div>' +
+      '</div></div>' +
+      '</div>');
+    var settingsBody = drawer.find('.settings__body');
     var done = $('<div class="simple-button selector lampa-filters-drawer__done">Готово</div>');
     bindScrollIntoView(done);
     done.on('hover:enter', closeDrawer);
-    drawer.append(done);
-    var body = $('<div></div>');
-    drawer.append(body);
+    settingsBody.append(done);
+    var body = $('<div class="lampa-filters-list"></div>');
+    settingsBody.append(body);
     addFilterControls(body, config.favorites, false);
     $('body').append(drawer);
     Lampa.Controller.add('lampa_filters_drawer', {
