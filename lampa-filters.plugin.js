@@ -784,9 +784,14 @@
     Lampa.Settings.listener.follow('open', function (event) {
       if (event.name !== 'lampa_filters') return;
       var body = event.body;
-      body.empty();
+      var scrollBody = body.find('.scroll__body').first();
+      if (!scrollBody.length) scrollBody = body.find('.scroll__content').first();
+      if (!scrollBody.length) scrollBody = body;
+      var host = scrollBody.children().first();
+      if (!host.length) host = scrollBody;
+      host.empty();
       var list = $('<div class="lampa-filters-list"></div>');
-      body.append(list);
+      host.append(list);
       list.append('<div class="settings-param-title"><span>Подборки (релизы, каталог, главная, топ, коллекции)</span></div>');
       addFilterControls(list, config, true);
       var favRow = $('<div class="settings-param selector" data-static="true">' +
