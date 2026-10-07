@@ -32,7 +32,7 @@
     year_to: null,
     quality: ['4k', 'webdl', 'bdrip'],
     keep_unknown_quality: true,
-    filter_cam: true,
+    filter_cam: false,
     include_genres: [],
     exclude_genres: [27],
     favorites: {
@@ -43,7 +43,7 @@
       year_to: null,
       quality: [],
       keep_unknown_quality: true,
-      filter_cam: true,
+      filter_cam: false,
       include_genres: [],
       exclude_genres: []
     }
@@ -160,7 +160,7 @@
       if (!hit) return false;
     }
     var quality = (item.release_quality || '').toLowerCase();
-    if (rules.filter_cam !== false && CAM_QUALITY.indexOf(quality) !== -1) return false;
+    if (rules.filter_cam && CAM_QUALITY.indexOf(quality) !== -1) return false;
     var allowed = (rules.quality || []).map(function (code) { return code.toLowerCase(); });
     if (allowed.length && quality && allowed.indexOf(quality) === -1) return false;
     if (allowed.length && !quality && !rules.keep_unknown_quality) return false;
@@ -507,11 +507,11 @@
 
     var camRow = mk('Экранка (ts/tc) - видео, снятое в кинозале');
     function refreshCam() {
-      camRow.set(rules.filter_cam !== false ? 'отсекать (рекомендуется)' : 'показывать');
+      camRow.set(rules.filter_cam ? 'отсекать (рекомендуется)' : 'показывать (как в Lampa)');
     }
     refreshCam();
     camRow.el.on('hover:enter', function () {
-      rules.filter_cam = rules.filter_cam === false;
+      rules.filter_cam = !rules.filter_cam;
       commit();
       refreshCam();
     });
@@ -575,15 +575,29 @@
     genrePickerRow('Только жанры (хотя бы один; пусто = любые)', rules.include_genres);
   }
 
-  function openFavoritesFilter() {
-    var wasFavorites = (Lampa.Activity.active() || {}).component === 'favorite';
+  function openSettingsFilter(component) {
     if (typeof $ === 'function' && !$('body').hasClass('settings--open')) Lampa.Controller.toggle('settings');
-    Lampa.Settings.create('lampa_filters_favorites', {
+    Lampa.Settings.create(component, {
       onBack: function () {
         Lampa.Controller.toggle('settings');
-        if (wasFavorites) Lampa.Activity.refresh();
+        if ((Lampa.Activity.active() || {}).component === 'favorite') Lampa.Activity.refresh();
       }
     });
+  }
+
+  function filterContext() {
+    var stack = (Lampa.Activity.all && Lampa.Activity.all()) || [];
+    for (var i = stack.length - 1; i >= 0; i--) {
+      var component = stack[i] && stack[i].component;
+      if (component === 'favorite') return 'favorites';
+      if (component === 'full') continue;
+      return 'global';
+    }
+    return 'global';
+  }
+
+  function openFilterByContext() {
+    openSettingsFilter(filterContext() === 'favorites' ? 'lampa_filters_favorites' : 'lampa_filters');
   }
 
   function hookSettings() {
@@ -616,7 +630,7 @@
           '<div class="settings-param__name">Избранное (отдельные правила)</div>' +
           '<div class="settings-param__value">' + (config.favorites.enabled ? 'вкл, открыть' : 'выкл, открыть') + '</div></div>');
         bindScrollIntoView(favRow);
-        favRow.on('hover:enter', openFavoritesFilter);
+        favRow.on('hover:enter', function () { openSettingsFilter('lampa_filters_favorites'); });
         list.append(favRow);
       } else {
         addFilterControls(list, config.favorites, false);
@@ -637,7 +651,7 @@
     if (config.include_genres.length) parts.push('только жанры ' + config.include_genres.join(','));
     if (config.year_from || config.year_to) parts.push('годы ' + (config.year_from || '...') + '-' + (config.year_to || '...'));
     if (config.quality && config.quality.length) parts.push('качество ' + config.quality.join('/'));
-    parts.push('экранка ' + (config.filter_cam !== false ? 'отсекается' : 'показывается'));
+    parts.push('экранка ' + (config.filter_cam ? 'отсекается' : 'показывается'));
     return parts.join('; ');
   }
 
@@ -651,7 +665,7 @@
       } catch (error) {}
       if (headHtml && headHtml.length) {
         try {
-          Lampa.Head.addIcon(ICON, openFavoritesFilter);
+          Lampa.Head.addIcon(ICON, openFilterByContext);
           console.log('[lampa-filters] кнопка фильтра добавлена в шапку');
         } catch (error) {
           console.warn('[lampa-filters]', error);

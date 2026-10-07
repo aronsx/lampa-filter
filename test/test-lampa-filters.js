@@ -25,19 +25,20 @@ function makeEnv(storageInitial) {
     { title: 'Персона', popularity: 12.0 },
     { title: 'Старый-2017', vote_average: 8.0, vote_count: 100, release_quality: '4K', genre_ids: [28], release_date: '2017-03-03' }
   ];
-  const env = { fixtures, storage, listeners, reliseCalls: [], requests: [], refreshed: 0 };
+  const env = { fixtures, storage, listeners, reliseCalls: [], requests: [], refreshed: 0, stack: [{ component: 'main' }], settingsCreated: null, headAction: null };
   const jQuery = function () {
-    return { append: () => {}, on: () => {}, parent: () => ({ length: 1 }), detach: () => {}, remove: () => {}, children: () => ({ last: () => ({}) }) };
+    return { append: () => {}, on: () => {}, parent: () => ({ length: 1 }), detach: () => {}, remove: () => {}, children: () => ({ last: () => ({}) }), hasClass: () => false };
   };
   const Lampa = {
     Storage: storage,
     SettingsApi: { addComponent: () => {} },
-    Settings: { listener: { follow: () => {} } },
+    Settings: { listener: { follow: () => {} }, create: (name, params) => { env.settingsCreated = name; env.settingsParams = params; } },
     Favorite: { get: () => fixtures.slice() },
     Select: { show: () => {} },
     Listener: { follow: (name, cb) => { (listeners[name] = listeners[name] || []).push(cb); } },
     Controller: { add: () => {}, toggle: () => {}, back: () => {}, collectionSet: () => {}, collectionFocus: () => {} },
-    Activity: { active: () => ({ component: 'test' }), refresh: () => { env.refreshed++; } },
+    Activity: { active: () => env.stack[env.stack.length - 1], all: () => env.stack, refresh: () => { env.refreshed++; } },
+    Head: { render: () => ({ length: 1 }), addIcon: (icon, action) => { env.headAction = action; } },
     TMDB: { key: () => 'testkey', api: (u) => 'https://test.example/3/' + u },
     Reguest: function () {
       return { silent: (url, ok) => { env.requests.push({ url: url, ok: ok }); }, clear: () => {}, timeout: () => {} };
@@ -104,7 +105,7 @@ function deliver(env, url) {
   check('expired timer auto-disables and persists config', env.storage.dump().lampa_filters.enabled === false);
 
   const fav = env.Lampa.Favorite.get();
-  check('favorites filtered by own rules (rating >= 8)', fav.map(r => r.title).join(',') === 'Курьер,Персона,Старый-2017');
+  check('favorites filtered by own rules (rating >= 8, экранка теперь проходит)', fav.map(r => r.title).join(',') === 'Курьер,Экранка,Персона,Старый-2017');
 }
 
 {
@@ -150,10 +151,10 @@ function deliver(env, url) {
 {
   const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [], exclude_genres: [] };
 
-  const env = makeEnv({ lampa_filters: Object.assign({}, base, { exclude_genres: [27], favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { exclude_genres: [27], filter_cam: true, favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
   loadPlugin();
   const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
-  check('исключающий [27]: хоррор скрыт, экранка уходит по умолчанию', !out.results.some(r => r.title === 'Хоррор') && !out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length - 2);
+  check('исключающий [27] + filter_cam=true: хоррор и экранка скрыты', !out.results.some(r => r.title === 'Хоррор') && !out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length - 2);
 }
 
 {
@@ -192,7 +193,32 @@ function deliver(env, url) {
   const env = makeEnv({ lampa_filters: Object.assign({}, base, { filter_cam: false, favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
   loadPlugin();
   const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
-  check('экранка опциональна: при filter_cam=false показывается', out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length);
+  check('экранка по умолчанию (filter_cam=false): показывается, стоковое поведение', out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length);
+}
+
+{
+  const env = makeEnv({});
+  loadPlugin();
+
+  env.stack = [{ component: 'main' }];
+  env.settingsCreated = null;
+  env.headAction();
+  check('шапка на обычном экране: открывается глобальный фильтр', env.settingsCreated === 'lampa_filters');
+
+  env.stack = [{ component: 'favorite' }];
+  env.settingsCreated = null;
+  env.headAction();
+  check('шапка на избранном: открывается фильтр избранного', env.settingsCreated === 'lampa_filters_favorites');
+
+  env.stack = [{ component: 'favorite' }, { component: 'full' }];
+  env.settingsCreated = null;
+  env.headAction();
+  check('шапка на карточке из избранного: открывается фильтр избранного', env.settingsCreated === 'lampa_filters_favorites');
+
+  env.stack = [{ component: 'main' }, { component: 'category_full' }, { component: 'full' }];
+  env.settingsCreated = null;
+  env.headAction();
+  check('шапка на карточке из каталога: открывается глобальный фильтр', env.settingsCreated === 'lampa_filters');
 }
 
 console.log('\nитог: ' + passed + ' проверок пройдено');
