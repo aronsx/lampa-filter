@@ -147,4 +147,43 @@ function deliver(env, url) {
   check('астрал отсеян по жанру из кэша', !fav.some(r => r.title === 'Астрал'));
 }
 
+{
+  const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [], exclude_genres: [] };
+
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { exclude_genres: [27], favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
+  loadPlugin();
+  const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
+  check('исключающий [27]: хоррор скрыт, остальные на месте (экранка уходит всегда)', !out.results.some(r => r.title === 'Хоррор') && !out.results.some(r => r.title === 'Экранка') && out.results.length === env.fixtures.length - 2);
+}
+
+{
+  const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [], exclude_genres: [] };
+
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { include_genres: [35], favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
+  loadPlugin();
+  const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
+  check('включающий [35]: только комедии и не-контент', out.results.map(r => r.title).join(',') === 'Курьер,Новинка-без-голосов,Персона');
+}
+
+{
+  const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [], exclude_genres: [] };
+
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { include_genres: [53], exclude_genres: [27], favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
+  env.fixtures.push({ title: 'Чистый-триллер', vote_average: 8.0, vote_count: 10, genre_ids: [53], release_date: '2026-01-01' });
+  loadPlugin();
+  const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
+  check('комбо include [53] + exclude [27]: хоррор (27,53) скрыт, чистый триллер остался', out.results.map(r => r.title).join(',') === 'Персона,Чистый-триллер');
+}
+
+{
+  const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [], exclude_genres: [] };
+
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { exclude_genres: [27], favorites: Object.assign({}, base.favorites || {}, { enabled: false }) }) });
+  env.fixtures.push({ name: 'Сериал-хоррор', first_air_date: '2026-02-02', vote_average: 8.0, vote_count: 30, genre_ids: [18, 27] });
+  env.fixtures.push({ title: 'Из-детали', release_date: '2026-03-03', vote_average: 8.0, vote_count: 30, genres: [{ id: 27, name: 'ужасы' }] });
+  loadPlugin();
+  const out = deliver(env, 'https://tmdb.cubnotrip.top/?sort=top');
+  check('исключающий [27]: ТВ-карточка и жанры-объекты тоже отсеиваются', !out.results.some(r => r.name === 'Сериал-хоррор') && !out.results.some(r => r.title === 'Из-детали'));
+}
+
 console.log('\nитог: ' + passed + ' проверок пройдено');
