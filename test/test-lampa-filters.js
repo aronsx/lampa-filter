@@ -41,7 +41,7 @@ function makeEnv(storageInitial) {
     Head: { render: () => ({ length: 1 }), addIcon: (icon, action) => { env.headAction = action; } },
     TMDB: { key: () => 'testkey', api: (u) => 'https://test.example/3/' + u },
     Reguest: function () {
-      return { silent: (url, ok) => { env.requests.push({ url: url, ok: ok }); }, clear: () => {}, timeout: () => {} };
+      return { silent: (url, ok, err) => { env.requests.push({ url: url, ok: ok, err: err }); }, clear: () => {}, timeout: () => {} };
     },
     Api: {
       relise: (params, cb) => {
@@ -141,7 +141,7 @@ function deliver(env, url) {
   check('астрал без жанров: остаётся до уточнения', fav.some(r => r.title === 'Астрал') && env.requests.length === 1 && /movie\/555/.test(env.requests[0].url));
 
   env.requests[0].ok({ genres: [{ id: 27, name: 'ужасы' }] });
-  check('жанры уточнены и закэшированы', env.storage.dump().lampa_filters_genres['555'][0] === 27);
+  check('жанры уточнены и закэшированы', env.storage.dump().lampa_filters_genres_v2['555'][0] === 27);
   check('экран обновился после уточнения', env.refreshed > 0);
 
   fav = env.Lampa.Favorite.get();
@@ -219,6 +219,27 @@ function deliver(env, url) {
   env.settingsCreated = null;
   env.headAction();
   check('шапка на карточке из каталога: открывается глобальный фильтр', env.settingsCreated === 'lampa_filters');
+}
+
+{
+  const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [27], exclude_genres: [] };
+
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { favorites: Object.assign({}, JSON.parse(JSON.stringify(base)), { enabled: true, include_genres: [27], rating_min: 0, quality: [] }) }) });
+  env.fixtures.push({ title: 'Без-жанров', vote_average: 7.5, id: 777, release_date: '2026-01-01' });
+  loadPlugin();
+
+  let fav = env.Lampa.Favorite.get();
+  check('сетевая ошибка: карточка остаётся, запрос ушёл', fav.some(r => r.title === 'Без-жанров') && env.requests.length === 1 && /movie\/777/.test(env.requests[0].url));
+
+  env.requests[0].err();
+  check('сетевая ошибка: кэш НЕ отравлен пустым значением', env.storage.dump().lampa_filters_genres_v2 === undefined || env.storage.dump().lampa_filters_genres_v2['777'] === undefined);
+
+  fav = env.Lampa.Favorite.get();
+  env.requests[1].ok({ genres: [] });
+  check('успех без жанров и без imdb: закэширован unknown, экран обновился', env.storage.dump().lampa_filters_genres_v2['777'] === 'unknown' && env.refreshed > 0);
+
+  fav = env.Lampa.Favorite.get();
+  check('включающий фильтр НЕ прячет карточку с unknown-жанром', fav.some(r => r.title === 'Без-жанров') && fav.some(r => r.title === 'Хоррор'));
 }
 
 console.log('\nитог: ' + passed + ' проверок пройдено');

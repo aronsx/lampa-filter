@@ -102,11 +102,11 @@
     return true;
   }
 
-  var genreCache = Lampa.Storage.get('lampa_filters_genres', '{}') || {};
+  var genreCache = Lampa.Storage.get('lampa_filters_genres_v2', '{}') || {};
 
   function cacheGenres(id, ids) {
     genreCache[id] = ids;
-    Lampa.Storage.set('lampa_filters_genres', genreCache);
+    Lampa.Storage.set('lampa_filters_genres_v2', genreCache);
   }
 
   function genreIds(item) {
@@ -114,8 +114,8 @@
     (item.genres || []).forEach(function (genre) {
       if (ids.indexOf(genre.id) === -1) ids.push(genre.id);
     });
-    if (!ids.length && item.id in genreCache) {
-      (genreCache[item.id] || []).forEach(function (id) {
+    if (!ids.length && Array.isArray(genreCache[item.id])) {
+      genreCache[item.id].forEach(function (id) {
         ids.push(id);
       });
     }
@@ -152,6 +152,7 @@
       if (ids.indexOf(excluded[i]) !== -1) return false;
     }
     var include = rules.include_genres || [];
+    if (include.length && !ids.length && genreCache[item.id] === 'unknown') return true;
     if (include.length) {
       var hit = false;
       for (i = 0; i < include.length; i++) {
@@ -254,10 +255,10 @@
           delete genrePending[item.id];
           afterEnrich();
         } else {
-          fallbackFind(item);
+          fallbackFind(item, !data);
         }
       }, function () {
-        fallbackFind(item);
+        fallbackFind(item, true);
       });
     } catch (error) {
       console.warn('[lampa-filters]', error);
@@ -266,20 +267,26 @@
     }
   }
 
-  function fallbackFind(item) {
-    var finish = function (ids) {
-      cacheGenres(item.id, ids || []);
+  function fallbackFind(item, mainFailed) {
+    var done = function (value) {
+      cacheGenres(item.id, value);
       delete genrePending[item.id];
       afterEnrich();
     };
-    if (!item.imdb_id) return finish([]);
+    var retryLater = function () {
+      delete genrePending[item.id];
+    };
+    if (!item.imdb_id) {
+      if (mainFailed) retryLater();
+      else done('unknown');
+      return;
+    }
     var url = Lampa.TMDB.api('find/' + item.imdb_id + '?external_source=imdb_id&api_key=' + Lampa.TMDB.key() + '&language=ru');
     new Lampa.Reguest().silent(url, function (data) {
       var first = (data.movie_results && data.movie_results[0]) || (data.tv_results && data.tv_results[0]);
-      finish(first && Array.isArray(first.genre_ids) ? first.genre_ids : []);
-    }, function () {
-      finish([]);
-    });
+      if (first && Array.isArray(first.genre_ids) && first.genre_ids.length) done(first.genre_ids);
+      else done('unknown');
+    }, retryLater);
   }
 
   function afterEnrich() {
@@ -299,7 +306,7 @@
           if (unknown.length) enrichGenres(unknown);
           var before = res.length;
           res = res.filter(function (item) {
-            if (needsEnrich(item)) return true;
+            if (needsEnrich(item) || genrePending[item.id]) return true;
             return pass(item, config.favorites);
           });
           if (res.length !== before || unknown.length) console.log('[lampa-filters] избранное: ' + before + ' -> ' + res.length + ' (жанры уточняются: ' + unknown.length + ')');
