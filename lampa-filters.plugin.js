@@ -176,8 +176,12 @@
   function watchFabPosition() {
     if (typeof document === 'undefined') return;
     setInterval(function () {
-      if (!onFavoritesScreen() || !fab || fabPlaced) return;
-      placeFab();
+      if (!onFavoritesScreen()) {
+        removeFab();
+        return;
+      }
+      ensureFab();
+      if (!fabPlaced) placeFab();
     }, 500);
     $(window).on('resize', function () {
       fabPlaced = false;
@@ -725,8 +729,17 @@
 
     function genrePickerRow(name, list) {
       var row = mk(name);
+      function genreTitle(id) {
+        var found = GENRES.filter(function (genre) { return genre.id === id; });
+        return found.length ? found[0].title : String(id);
+      }
       function refresh() {
-        row.set(list.length ? 'выбрано ' + list.length : 'нет');
+        if (!list.length) {
+          row.set('нет');
+          return;
+        }
+        var names = list.slice(0, 2).map(genreTitle).join(', ');
+        row.set(list.length > 2 ? names + ' +' + (list.length - 2) : names);
       }
       refresh();
       row.el.on('hover:enter', function () {
