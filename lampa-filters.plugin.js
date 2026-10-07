@@ -143,10 +143,7 @@
     return html.find('.card').toArray();
   }
 
-  function favoritesFirstCard() {
-    var cards = favoritesCards();
-    return cards.length ? $(cards[0]) : $();
-  }
+
 
   function secondRowStartCard() {
     var cards = favoritesCards().map(function (element) {
@@ -199,11 +196,11 @@
     return null;
   }
 
-  function firstCardFocused() {
+  function anchorCardFocused() {
     var focused = focusedElement();
     if (!focused) return false;
-    var card = favoritesFirstCard();
-    return card.length && focused === card[0];
+    var anchor = secondRowStartCard();
+    return anchor && focused === anchor.element;
   }
 
   function fabFocused() {
@@ -246,7 +243,7 @@
           if (direction === 'up') return;
           return origMove.call(Lampa.Controller, direction);
         }
-        if (direction === 'up' && onFavoritesScreen() && firstCardFocused()) {
+        if (direction === 'up' && onFavoritesScreen() && anchorCardFocused()) {
           focusFab();
           return;
         }
