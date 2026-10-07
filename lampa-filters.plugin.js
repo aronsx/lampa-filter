@@ -51,8 +51,6 @@
 
   var DRAWER_CSS = [
     '.lampa-filters-list{width:100%;max-height:calc(100vh - 9em);overflow-y:auto;padding-right:0.5em}',
-    '.lampa-filters-fab{position:fixed;left:24px;bottom:24px;z-index:40}',
-    '.lampa-filters-fab .simple-button.focus,.lampa-filters-fab .simple-button:hover{outline:2px solid #fff}',
     '.lampa-filters-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:49}',
     '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:460px;max-width:92vw;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5)}',
     '.lampa-filters-panel{display:flex;flex-direction:column;height:100%;background:#262829}',
@@ -66,24 +64,6 @@
   var drawer = null;
   var backdrop = null;
   var drawerToggled = false;
-  var fab = null;
-
-  function ensureFab() {
-    if (!fab) {
-      fab = $('<div class="lampa-filters-fab"><div class="simple-button selector">Фильтр</div></div>');
-      fab.on('hover:enter', toggleDrawer);
-    }
-    if (!fab.parent().length) $('body').append(fab);
-  }
-
-  function removeFab() {
-    if (fab) fab.detach();
-  }
-
-  function toggleDrawer() {
-    if (drawer) closeDrawer();
-    else openDrawer();
-  }
 
   function openDrawer() {
     if (drawer) return;
@@ -137,70 +117,6 @@
     if (active && active.component === 'favorite') Lampa.Activity.refresh();
   }
 
-  var screenControllerName = '';
-
-  function onFavoritesScreen() {
-    var active = Lampa.Activity.active();
-    return active && active.component === 'favorite';
-  }
-
-  function favoritesCards() {
-    var active = Lampa.Activity.active();
-    var html = active && active.activity && active.activity.render ? active.activity.render() : null;
-    if (!html || !html.find) return [];
-    return html.find('.card').toArray();
-  }
-
-
-
-  function secondRowStartCard() {
-    var cards = favoritesCards().map(function (element) {
-      var rect = element.getBoundingClientRect();
-      return { element: element, top: rect.top, left: rect.left, width: rect.width };
-    }).filter(function (item) {
-      return item.width > 0;
-    });
-    if (!cards.length) return null;
-    var minTop = Math.min.apply(null, cards.map(function (item) { return item.top; }));
-    var firstRow = cards.filter(function (item) {
-      return Math.abs(item.top - minTop) < 12;
-    }).sort(function (a, b) {
-      return a.left - b.left;
-    });
-    return firstRow.length > 1 ? firstRow[1] : firstRow[0];
-  }
-
-  function placeFab() {
-    if (!fab || !fab.parent().length) return;
-    var anchor = secondRowStartCard();
-    if (!anchor) return;
-    fabPlaced = true;
-    var fabRect = fab[0].getBoundingClientRect();
-    fab.css({
-      left: Math.round(anchor.left + anchor.width / 2 - fabRect.width / 2) + 'px',
-      top: Math.round(anchor.top - fabRect.height - 32) + 'px',
-      bottom: 'auto'
-    });
-  }
-
-  var fabPlaced = false;
-
-  function watchFabPosition() {
-    if (typeof document === 'undefined') return;
-    setInterval(function () {
-      if (!onFavoritesScreen()) {
-        removeFab();
-        return;
-      }
-      ensureFab();
-      if (!fabPlaced) placeFab();
-    }, 500);
-    $(window).on('resize', function () {
-      fabPlaced = false;
-      if (onFavoritesScreen() && fab) placeFab();
-    });
-  }
-
   function focusedElement() {
     try {
       if (window.Navigator && Navigator.getFocusedElement) return Navigator.getFocusedElement();
@@ -208,82 +124,6 @@
     return null;
   }
 
-  function anchorCardFocused() {
-    var focused = focusedElement();
-    if (!focused) return false;
-    var anchor = secondRowStartCard();
-    return anchor && focused === anchor.element;
-  }
-
-  function fabFocused() {
-    if (!fab) return false;
-    var focused = focusedElement();
-    var button = fab.find('.simple-button');
-    return button.length && focused === button[0];
-  }
-
-  function focusFab() {
-    var enabled = Lampa.Controller.enabled();
-    screenControllerName = (enabled && enabled.name) || '';
-    Lampa.Controller.add('lampa_filters_fab', {
-      invisible: true,
-      toggle: function () {
-        Lampa.Controller.collectionSet(fab);
-        Lampa.Controller.collectionFocus(false, fab);
-        fab.find('.simple-button').addClass('focus');
-      },
-      down: function () {
-        fab.find('.simple-button').removeClass('focus');
-        Lampa.Controller.toggle(screenControllerName);
-      },
-      enter: openDrawer,
-      back: function () {
-        fab.find('.simple-button').removeClass('focus');
-        Lampa.Controller.toggle(screenControllerName);
-      }
-    });
-    Lampa.Controller.toggle('lampa_filters_fab');
-  }
-
-  function hookNavigation() {
-    if (!Lampa.Controller || !Lampa.Controller.move || Lampa.Controller.move.__lampaFilters) return;
-    var origMove = Lampa.Controller.move;
-    var wrapped = function (direction) {
-      try {
-        if (fab && fabFocused()) {
-          if (direction === 'down') {
-            Lampa.Controller.toggle(screenControllerName);
-            return;
-          }
-          if (direction === 'up') return;
-          return origMove.call(Lampa.Controller, direction);
-        }
-        if (direction === 'up' && onFavoritesScreen() && anchorCardFocused()) {
-          focusFab();
-          return;
-        }
-      } catch (error) {
-        console.warn('[lampa-filters]', error);
-      }
-      return origMove.call(Lampa.Controller, direction);
-    };
-    wrapped.__lampaFilters = true;
-    Lampa.Controller.move = wrapped;
-  }
-
-  function hookFavoritesScreen() {
-    Lampa.Listener.follow('activity', function (event) {
-      if (event.component !== 'favorite') {
-        removeFab();
-        return;
-      }
-      if (event.type === 'destroy') removeFab();
-      else {
-        ensureFab();
-        fabPlaced = false;
-      }
-    });
-  }
 
   function loadConfig() {
     var saved = {};
@@ -831,6 +671,12 @@
     return parts.join('; ');
   }
 
+  function addHeadIcon() {
+    if (!Lampa.Head || !Lampa.Head.addIcon) return;
+    Lampa.Head.addIcon(ICON, openDrawer);
+    console.log('[lampa-filters] кнопка фильтра добавлена в шапку');
+  }
+
   function start() {
     if (config.enabled && config.auto_off_hours && !config.enabled_at) {
       config.enabled_at = Date.now();
@@ -841,9 +687,7 @@
     hookRelise();
     hookFavorite();
     hookSettings();
-    hookFavoritesScreen();
-    hookNavigation();
-    watchFabPosition();
+    addHeadIcon();
     if (listsActive()) {
       console.log('%c[lampa-filters] v' + VERSION + ' активен: ' + summary(), 'color:#0a0;font-weight:bold');
     } else {
