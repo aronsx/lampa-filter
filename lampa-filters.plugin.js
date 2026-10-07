@@ -89,6 +89,7 @@
     drawer = $('<div class="lampa-filters-drawer"></div>');
     drawer.append('<div class="lampa-filters-drawer__head">Фильтр избранного</div>');
     var done = $('<div class="simple-button selector lampa-filters-drawer__done">Готово</div>');
+    bindScrollIntoView(done);
     done.on('hover:enter', closeDrawer);
     drawer.append(done);
     var body = $('<div></div>');
@@ -440,7 +441,9 @@
 
   function enrichGenres(items) {
     var need = items.filter(needsEnrich);
-    if (!need.length || !Lampa.TMDB || !Lampa.Reguest) return;
+    if (!need.length) return;
+    if (!Lampa.TMDB || typeof Lampa.TMDB.api !== 'function' ||
+        typeof Lampa.TMDB.key !== 'function' || typeof Lampa.Reguest !== 'function') return;
     need.forEach(enrichItem);
   }
 
@@ -450,21 +453,27 @@
   }
 
   function enrichItem(item) {
-    genrePending[item.id] = true;
-    var isTv = !item.release_date && (item.first_air_date || item.name);
-    var url = Lampa.TMDB.api((isTv ? 'tv/' : 'movie/') + item.id + '?api_key=' + Lampa.TMDB.key() + '&language=ru');
-    var network = new Lampa.Reguest();
-    network.silent(url, function (data) {
-      if (data && Array.isArray(data.genres) && data.genres.length) {
-        cacheGenres(item.id, data.genres.map(function (genre) { return genre.id; }));
-        delete genrePending[item.id];
-        afterEnrich();
-      } else {
+    try {
+      genrePending[item.id] = true;
+      var isTv = !item.release_date && (item.first_air_date || item.name);
+      var url = Lampa.TMDB.api((isTv ? 'tv/' : 'movie/') + item.id + '?api_key=' + Lampa.TMDB.key() + '&language=ru');
+      var network = new Lampa.Reguest();
+      network.silent(url, function (data) {
+        if (data && Array.isArray(data.genres) && data.genres.length) {
+          cacheGenres(item.id, data.genres.map(function (genre) { return genre.id; }));
+          delete genrePending[item.id];
+          afterEnrich();
+        } else {
+          fallbackFind(item);
+        }
+      }, function () {
         fallbackFind(item);
-      }
-    }, function () {
-      fallbackFind(item);
-    });
+      });
+    } catch (error) {
+      console.warn('[lampa-filters]', error);
+      delete genrePending[item.id];
+      afterEnrich();
+    }
   }
 
   function fallbackFind(item) {
@@ -494,35 +503,53 @@
     var orig = Lampa.Favorite.get;
     Lampa.Favorite.get = function () {
       var res = orig.apply(this, arguments);
-      if (Array.isArray(res) && config.favorites.enabled) {
-        var unknown = res.filter(needsEnrich);
-        if (unknown.length) enrichGenres(unknown);
-        var before = res.length;
-        res = res.filter(function (item) {
-          if (needsEnrich(item)) return true;
-          return pass(item, config.favorites);
-        });
-        if (res.length !== before || unknown.length) console.log('[lampa-filters] избранное: ' + before + ' -> ' + res.length + ' (жанры уточняются: ' + unknown.length + ')');
+      try {
+        if (Array.isArray(res) && config.favorites.enabled) {
+          var unknown = res.filter(needsEnrich);
+          if (unknown.length) enrichGenres(unknown);
+          var before = res.length;
+          res = res.filter(function (item) {
+            if (needsEnrich(item)) return true;
+            return pass(item, config.favorites);
+          });
+          if (res.length !== before || unknown.length) console.log('[lampa-filters] избранное: ' + before + ' -> ' + res.length + ' (жанры уточняются: ' + unknown.length + ')');
+        }
+      } catch (error) {
+        console.warn('[lampa-filters]', error);
       }
       return res;
     };
   }
 
+  function bindScrollIntoView(el) {
+    el.on('hover:focus', function (event) {
+      try {
+        if (event.target && event.target.scrollIntoView) event.target.scrollIntoView({ block: 'nearest' });
+      } catch (error) {}
+    });
+    return el;
+  }
+
+  function restoreFocus(restore, focusedBefore) {
+    if (restore) Lampa.Controller.toggle(restore);
+    if (focusedBefore) Lampa.Controller.collectionFocus(focusedBefore);
+  }
+
   function choose(title, options, current, onSelect) {
     var restore = (Lampa.Controller.enabled() || {}).name;
-    var back = function () {
-      if (restore) Lampa.Controller.toggle(restore);
-    };
+    var focusedBefore = focusedElement();
     Lampa.Select.show({
       title: title,
       items: options.map(function (option) {
         return { title: option.title, selected: option.value === current, __value: option.value };
       }),
       onSelect: function (element) {
-        back();
+        restoreFocus(restore, focusedBefore);
         onSelect(element.__value);
       },
-      onBack: back
+      onBack: function () {
+        restoreFocus(restore, focusedBefore);
+      }
     });
   }
 
@@ -562,13 +589,7 @@
       body.append($('<div class="settings-param selector" data-static="true"></div>')
         .append('<div class="settings-param__name">' + name + '</div>').append(value));
       var el = body.children().last();
-      el.on('hover:focus', function (event) {
-        try {
-          if (event.target && event.target.scrollIntoView) {
-            event.target.scrollIntoView({ block: 'nearest' });
-          }
-        } catch (error) {}
-      });
+      bindScrollIntoView(el);
       return {
         el: el,
         set: function (text) { value.text(text); }
@@ -715,6 +736,7 @@
       refresh();
       row.el.on('hover:enter', function () {
         var restore = (Lampa.Controller.enabled() || {}).name;
+        var focusedBefore = focusedElement();
         Lampa.Select.show({
           title: name,
           items: GENRES.map(function (genre) {
@@ -733,7 +755,7 @@
             refresh();
           },
           onBack: function () {
-            if (restore) Lampa.Controller.toggle(restore);
+            restoreFocus(restore, focusedBefore);
           }
         });
       });
