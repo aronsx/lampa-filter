@@ -2,7 +2,7 @@
   'use strict';
 
   var STORAGE_KEY = 'lampa_filters';
-  var VERSION = '2026-10-07.2';
+  var VERSION = '2026-10-07.3';
   var CAM_QUALITY = ['ts', 'tc'];
   var QUALITIES = [
     { code: '4k', title: '4K' },
