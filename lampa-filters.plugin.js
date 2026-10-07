@@ -20,7 +20,7 @@
     { id: 37, title: 'вестерн' }
   ];
 
-  var ICON = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ddd" stroke-width="1.5"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>';
+  var ICON = '<svg><use xlink:href="#sprite-filter"></use></svg>';
 
   var DEFAULTS = {
     enabled: true,
