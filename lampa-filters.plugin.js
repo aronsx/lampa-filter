@@ -505,7 +505,7 @@
       });
     });
 
-    var camRow = mk('Экранка (ts/tc) - видео, снятое в кинозале');
+    var camRow = mk('Экранка (ts/tc)');
     function refreshCam() {
       camRow.set(rules.filter_cam ? 'отсекать (рекомендуется)' : 'показывать (как в Lampa)');
     }
