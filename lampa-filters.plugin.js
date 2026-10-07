@@ -239,7 +239,10 @@
     var wrapped = function (direction) {
       try {
         if (fab && fabFocused()) {
-          if (direction === 'down') Lampa.Controller.toggle(screenControllerName);
+          if (direction === 'down') {
+            Lampa.Controller.toggle(screenControllerName);
+            return;
+          }
           if (direction === 'up') return;
           return origMove.call(Lampa.Controller, direction);
         }
