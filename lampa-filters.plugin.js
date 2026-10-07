@@ -83,6 +83,26 @@
     Lampa.Storage.set(STORAGE_KEY, config);
   }
 
+  function purgeRequestCache() {
+    try {
+      if (typeof Cache !== 'undefined' && Cache.clearAll) {
+        Cache.clearAll();
+        console.log('[lampa-filters] кэш запросов очищен');
+      }
+    } catch (error) {
+      console.warn('[lampa-filters]', error);
+    }
+  }
+
+  function purgeOncePerVersion() {
+    try {
+      if (Lampa.Storage.get('lampa_filters_cache_purged', '') !== VERSION) {
+        Lampa.Storage.set('lampa_filters_cache_purged', VERSION);
+        purgeRequestCache();
+      }
+    } catch (error) {}
+  }
+
   function timerLeftText() {
     if (!config.enabled || !config.auto_off_hours || !config.enabled_at) return '';
     var ms = Math.max(0, config.auto_off_hours * 3600000 - (Date.now() - config.enabled_at));
@@ -96,6 +116,7 @@
       config.enabled = false;
       config.enabled_at = 0;
       saveConfig();
+      purgeRequestCache();
       console.log('[lampa-filters] авто-выключение: таймер истёк');
       return false;
     }
@@ -409,6 +430,7 @@
       }
       saveConfig();
       refreshEnabled();
+      if (main) purgeRequestCache();
     }
 
     if (main) {
@@ -430,6 +452,7 @@
       if (main && !rules.enabled) rules.enabled_at = 0;
       saveConfig();
       refreshEnabled();
+      if (main) purgeRequestCache();
     });
 
     if (main) {
@@ -445,6 +468,7 @@
           saveConfig();
           refreshHours();
           refreshEnabled();
+          purgeRequestCache();
         });
       });
     }
@@ -689,6 +713,7 @@
       saveConfig();
     }
     $('head').append('<style>' + DRAWER_CSS + '</style>');
+    purgeOncePerVersion();
     hookRequests();
     hookRelise();
     hookFavorite();

@@ -7,7 +7,10 @@ const PLUGINS = path.join(__dirname, '..', 'lampa-filters.plugin.js');
 function makeStorage(initial) {
   const store = Object.assign({}, initial);
   return {
-    get: (k, d) => (k in store ? JSON.parse(JSON.stringify(store[k])) : JSON.parse(d)),
+    get: (k, d) => {
+      if (k in store) return JSON.parse(JSON.stringify(store[k]));
+      try { return JSON.parse(d); } catch (e) { return d; }
+    },
     set: (k, v) => { store[k] = JSON.parse(JSON.stringify(v)); },
     dump: () => store
   };
@@ -55,6 +58,7 @@ function makeEnv(storageInitial) {
   };
   global.window = global;
   global.Lampa = Lampa;
+  global.Cache = { clearAll: () => { env.cachePurged = (env.cachePurged || 0) + 1; } };
   global.$ = jQuery;
   global.jQuery = jQuery;
   env.Lampa = Lampa;
@@ -97,12 +101,14 @@ function deliver(env, url) {
 }
 
 {
-  const env = makeEnv({ lampa_filters: { enabled: true, auto_off_hours: 12, enabled_at: Date.now() - 13 * 3600000, rating_min: 7, quality: ['4k', 'webdl', 'bdrip'], exclude_genres: [27], favorites: { enabled: true, rating_min: 8, quality: [], exclude_genres: [], include_genres: [], keep_unknown_quality: true } } });
+  const PLUGIN_VERSION = fs.readFileSync(PLUGINS, 'utf8').match(/VERSION = '([^']+)'/)[1];
+  const env = makeEnv({ lampa_filters: { enabled: true, auto_off_hours: 12, enabled_at: Date.now() - 13 * 3600000, rating_min: 7, quality: ['4k', 'webdl', 'bdrip'], exclude_genres: [27], favorites: { enabled: true, rating_min: 8, quality: [], exclude_genres: [], include_genres: [], keep_unknown_quality: true } }, lampa_filters_cache_purged: PLUGIN_VERSION });
   loadPlugin();
 
   const out = deliver(env, 'https://apitmdb.cubnotrip.top/3/discover/movie?page=1');
   check('expired timer disables list filtering', out.results.length === env.fixtures.length);
   check('expired timer auto-disables and persists config', env.storage.dump().lampa_filters.enabled === false);
+  check('истёкший таймер чистит кэш запросов (version-чистка выключена)', (env.cachePurged || 0) >= 1 && env.storage.dump().lampa_filters_cache_purged === PLUGIN_VERSION);
 
   const fav = env.Lampa.Favorite.get();
   check('favorites filtered by own rules (rating >= 8, экранка теперь проходит)', fav.map(r => r.title).join(',') === 'Курьер,Экранка,Персона,Старый-2017');
@@ -240,6 +246,13 @@ function deliver(env, url) {
 
   fav = env.Lampa.Favorite.get();
   check('включающий фильтр НЕ прячет карточку с unknown-жанром', fav.some(r => r.title === 'Без-жанров') && fav.some(r => r.title === 'Хоррор'));
+}
+
+{
+  const env = makeEnv({});
+  loadPlugin();
+  check('новая версия плагина чистит кэш один раз при старте', env.cachePurged >= 1);
+  check('флаг чистки сохранён по версии', typeof env.storage.dump().lampa_filters_cache_purged === 'string' && env.storage.dump().lampa_filters_cache_purged.length > 0);
 }
 
 console.log('\nитог: ' + passed + ' проверок пройдено');
