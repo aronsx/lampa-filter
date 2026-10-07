@@ -122,12 +122,7 @@
       Lampa.Controller.back();
     }
     var active = Lampa.Activity.active();
-    if (active && active.component === 'favorite') {
-      Lampa.Activity.refresh();
-      setTimeout(function () {
-        injectScreenButton({ object: Lampa.Activity.active() });
-      }, 1500);
-    }
+    if (active && active.component === 'favorite') Lampa.Activity.refresh();
   }
 
   var screenControllerName = '';
