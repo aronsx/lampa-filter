@@ -791,6 +791,12 @@
       addFilterControls(list, config, true);
       list.append('<div class="settings-param-title"><span>Избранное (отдельные правила)</span></div>');
       addFilterControls(list, config.favorites, false);
+      try {
+        var rows = list.find('.selector').toArray();
+        if (rows.length && Lampa.Controller.collectionAppend) Lampa.Controller.collectionAppend(rows);
+      } catch (error) {
+        console.warn('[lampa-filters]', error);
+      }
     });
   }
 
