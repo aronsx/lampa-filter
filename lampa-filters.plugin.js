@@ -200,9 +200,15 @@
     Lampa.Listener.follow('request_secuses', function (event) {
       try {
         var data = event.data;
+        var url = (event.params && event.params.url) || '';
+        var detail = url.match(/\/3\/(movie|tv)\/(\d+)(\?|$|\/)/);
+        if (detail && data && typeof data === 'object' && Array.isArray(data.genres) && data.genres.length) {
+          cacheGenres(data.id || parseInt(detail[2], 10), data.genres.map(function (genre) {
+            return genre.id;
+          }));
+        }
         if (!listsActive() || !data || typeof data !== 'object') return;
         if (!Array.isArray(data.results) || !data.results.length) return;
-        var url = (event.params && event.params.url) || '';
         if (url.indexOf('/search/') !== -1) return;
         var before = data.results.length;
         var filtered = data.results.filter(function (item) { return pass(item, config); });

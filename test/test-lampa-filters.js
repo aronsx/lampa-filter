@@ -255,4 +255,21 @@ function deliver(env, url) {
   check('флаг чистки сохранён по версии', typeof env.storage.dump().lampa_filters_cache_purged === 'string' && env.storage.dump().lampa_filters_cache_purged.length > 0);
 }
 
+{
+  const base = { enabled: true, auto_off_hours: 0, enabled_at: 0, rating_min: 0, rating_source: 'auto', year_from: null, year_to: null, quality: [], keep_unknown_quality: true, include_genres: [], exclude_genres: [] };
+
+  const env = makeEnv({ lampa_filters: Object.assign({}, base, { favorites: Object.assign({}, JSON.parse(JSON.stringify(base)), { enabled: true, include_genres: [27], rating_min: 0, quality: [] }) }) });
+  loadPlugin();
+
+  env.listeners['request_secuses'].forEach((cb) => cb({
+    params: { url: 'https://apitmdb.cubnotrip.top/3/movie/840705?api_key=k&language=ru' },
+    data: { id: 840705, title: 'Подай знак', genres: [{ id: 27, name: 'ужасы' }, { id: 53, name: 'триллер' }] }
+  }));
+  check('жанры подхватываются бесплатно из открытой карточки', env.storage.dump().lampa_filters_genres_v2['840705'].join(',') === '27,53');
+
+  env.fixtures.push({ title: 'Подай знак', id: 840705, vote_average: 6.9, release_date: '2024-08-21' });
+  const fav = env.Lampa.Favorite.get();
+  check('в избранном фильм отфильтрован по кэшу без доп. запроса', fav.some(r => r.title === 'Подай знак') && env.requests.length === 0);
+}
+
 console.log('\nитог: ' + passed + ' проверок пройдено');
