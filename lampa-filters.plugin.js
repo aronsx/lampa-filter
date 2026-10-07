@@ -672,9 +672,24 @@
   }
 
   function addHeadIcon() {
-    if (!Lampa.Head || !Lampa.Head.addIcon) return;
-    Lampa.Head.addIcon(ICON, openDrawer);
-    console.log('[lampa-filters] кнопка фильтра добавлена в шапку');
+    if (!Lampa.Head || !Lampa.Head.addIcon || !Lampa.Head.render) return;
+    var attempts = 0;
+    (function tryAdd() {
+      var headHtml = null;
+      try {
+        headHtml = Lampa.Head.render();
+      } catch (error) {}
+      if (headHtml && headHtml.length) {
+        try {
+          Lampa.Head.addIcon(ICON, openDrawer);
+          console.log('[lampa-filters] кнопка фильтра добавлена в шапку');
+        } catch (error) {
+          console.warn('[lampa-filters]', error);
+        }
+      } else if (attempts++ < 100) {
+        setTimeout(tryAdd, 100);
+      }
+    })();
   }
 
   function start() {
