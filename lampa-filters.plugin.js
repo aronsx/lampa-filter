@@ -509,14 +509,20 @@
   }
 
   function choose(title, options, current, onSelect) {
+    var restore = (Lampa.Controller.enabled() || {}).name;
+    var back = function () {
+      if (restore) Lampa.Controller.toggle(restore);
+    };
     Lampa.Select.show({
       title: title,
       items: options.map(function (option) {
         return { title: option.title, selected: option.value === current, __value: option.value };
       }),
       onSelect: function (element) {
+        back();
         onSelect(element.__value);
-      }
+      },
+      onBack: back
     });
   }
 
@@ -708,6 +714,7 @@
       }
       refresh();
       row.el.on('hover:enter', function () {
+        var restore = (Lampa.Controller.enabled() || {}).name;
         Lampa.Select.show({
           title: name,
           items: GENRES.map(function (genre) {
@@ -724,6 +731,9 @@
             if (!element.checked && index !== -1) list.splice(index, 1);
             commit();
             refresh();
+          },
+          onBack: function () {
+            if (restore) Lampa.Controller.toggle(restore);
           }
         });
       });
