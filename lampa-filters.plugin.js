@@ -51,81 +51,37 @@
 
   var DRAWER_CSS = [
     '.lampa-filters-list{width:100%;max-height:calc(100vh - 9em);overflow-y:auto;padding-right:0.5em}',
-    '.lampa-filters-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:49}',
-    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:35%;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5);transform:translate3d(100%,0,0);transition:transform 0.2s}',
-    '.lampa-filters-drawer--open{transform:translate3d(0,0,0)}',
-    '@media screen and (max-width:767px){.lampa-filters-drawer{width:50%}}',
-    '@media screen and (max-width:580px){.lampa-filters-drawer{width:70%}}',
-    '@media screen and (max-width:480px){.lampa-filters-drawer{width:100%}}',
-    '.lampa-filters-panel{display:flex;flex-direction:column;height:100%;background:#262829}',
-    '.lampa-filters-panel__head{flex-shrink:0;padding:2em 2em 0.6em;font-size:2.2em;font-weight:300}',
-    '.lampa-filters-panel__body{flex-grow:1;overflow-y:auto;padding-bottom:2em}',
-    '.lampa-filters-drawer .lampa-filters-list{max-height:none;overflow:visible;padding-right:0}',
-    'body.black--style .lampa-filters-panel{background-color:#000}',
-    'body.glass--style .lampa-filters-panel,body.glass--style-opacity--medium .lampa-filters-panel,body.glass--style-opacity--blacked .lampa-filters-panel{background-color:#262829}'
+    '.modal .lampa-filters-list{max-height:none;overflow:visible;padding-right:0}'
   ].join('');
 
-  var drawer = null;
-  var backdrop = null;
-  var drawerToggled = false;
+  var filterModalOpen = false;
 
-  function openDrawer() {
-    if (drawer) return;
-    backdrop = $('<div class="lampa-filters-backdrop"></div>');
-    backdrop.on('click', closeDrawer);
-    $('body').append(backdrop);
-    drawer = $(
-      '<div class="lampa-filters-drawer">' +
-      '<div class="lampa-filters-panel">' +
-      '<div class="lampa-filters-panel__head">Фильтр избранного</div>' +
-      '<div class="lampa-filters-panel__body"></div>' +
-      '</div>' +
-      '</div>');
-    var panelBody = drawer.find('.lampa-filters-panel__body');
-    var done = $('<div class="settings-param selector" data-static="true">' +
-      '<div class="settings-param__name">Готово</div>' +
-      '<div class="settings-param__value">закрыть</div></div>');
-    bindScrollIntoView(done);
-    done.on('hover:enter', closeDrawer);
-    panelBody.append(done);
+  function openFilterModal() {
+    if (filterModalOpen) return;
+    filterModalOpen = true;
+    var restoreController = (Lampa.Controller.enabled() || {}).name || 'content';
+    var wasFavorites = (Lampa.Activity.active() || {}).component === 'favorite';
     var body = $('<div class="lampa-filters-list"></div>');
-    panelBody.append(body);
     addFilterControls(body, config.favorites, false);
-    $('body').append(drawer);
-    setTimeout(function () {
-      drawer.addClass('lampa-filters-drawer--open');
-    }, 20);
-    Lampa.Controller.add('lampa_filters_drawer', {
-      toggle: function () {
-        drawerToggled = true;
-        Lampa.Controller.collectionSet(drawer);
-        Lampa.Controller.collectionFocus(false, drawer);
-      },
-      up: function () { Navigator.move('up'); },
-      down: function () { Navigator.move('down'); },
-      back: closeDrawer
+    Lampa.Modal.open({
+      title: 'Фильтр избранного',
+      html: body,
+      size: 'medium',
+      buttons: [
+        {
+          name: 'Готово',
+          onSelect: function () {
+            Lampa.Controller.back();
+          }
+        }
+      ],
+      onBack: function () {
+        Lampa.Modal.close();
+        filterModalOpen = false;
+        if (restoreController) Lampa.Controller.toggle(restoreController);
+        if (wasFavorites) Lampa.Activity.refresh();
+      }
     });
-    Lampa.Controller.toggle('lampa_filters_drawer');
-  }
-
-  function closeDrawer() {
-    if (!drawer) return;
-    drawer.removeClass('lampa-filters-drawer--open');
-    var closing = drawer;
-    setTimeout(function () {
-      closing.remove();
-    }, 260);
-    drawer = null;
-    if (backdrop) {
-      backdrop.remove();
-      backdrop = null;
-    }
-    if (drawerToggled) {
-      drawerToggled = false;
-      Lampa.Controller.back();
-    }
-    var active = Lampa.Activity.active();
-    if (active && active.component === 'favorite') Lampa.Activity.refresh();
   }
 
   function focusedElement() {
@@ -660,7 +616,7 @@
         '<div class="settings-param__name">Избранное (отдельные правила)</div>' +
         '<div class="settings-param__value">' + (config.favorites.enabled ? 'вкл, открыть' : 'выкл, открыть') + '</div></div>');
       bindScrollIntoView(favRow);
-      favRow.on('hover:enter', openDrawer);
+      favRow.on('hover:enter', openFilterModal);
       list.append(favRow);
       try {
         var rows = list.find('.selector').toArray();
@@ -692,7 +648,7 @@
       } catch (error) {}
       if (headHtml && headHtml.length) {
         try {
-          Lampa.Head.addIcon(ICON, openDrawer);
+          Lampa.Head.addIcon(ICON, openFilterModal);
           console.log('[lampa-filters] кнопка фильтра добавлена в шапку');
         } catch (error) {
           console.warn('[lampa-filters]', error);
