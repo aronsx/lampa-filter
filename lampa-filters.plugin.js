@@ -789,8 +789,12 @@
       body.append(list);
       list.append('<div class="settings-param-title"><span>Подборки (релизы, каталог, главная, топ, коллекции)</span></div>');
       addFilterControls(list, config, true);
-      list.append('<div class="settings-param-title"><span>Избранное (отдельные правила)</span></div>');
-      addFilterControls(list, config.favorites, false);
+      var favRow = $('<div class="settings-param selector" data-static="true">' +
+        '<div class="settings-param__name">Избранное (отдельные правила)</div>' +
+        '<div class="settings-param__value">' + (config.favorites.enabled ? 'вкл, открыть' : 'выкл, открыть') + '</div></div>');
+      bindScrollIntoView(favRow);
+      favRow.on('hover:enter', openDrawer);
+      list.append(favRow);
       try {
         var rows = list.find('.selector').toArray();
         if (rows.length && Lampa.Controller.collectionAppend) Lampa.Controller.collectionAppend(rows);
