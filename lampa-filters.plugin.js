@@ -54,36 +54,6 @@
     '.modal .lampa-filters-list{max-height:none;overflow:visible;padding-right:0}'
   ].join('');
 
-  var filterModalOpen = false;
-
-  function openFilterModal() {
-    if (filterModalOpen) return;
-    filterModalOpen = true;
-    var restoreController = (Lampa.Controller.enabled() || {}).name || 'content';
-    var wasFavorites = (Lampa.Activity.active() || {}).component === 'favorite';
-    var body = $('<div class="lampa-filters-list"></div>');
-    addFilterControls(body, config.favorites, false);
-    Lampa.Modal.open({
-      title: 'Фильтр избранного',
-      html: body,
-      size: 'medium',
-      buttons: [
-        {
-          name: 'Готово',
-          onSelect: function () {
-            Lampa.Controller.back();
-          }
-        }
-      ],
-      onBack: function () {
-        Lampa.Modal.close();
-        filterModalOpen = false;
-        if (restoreController) Lampa.Controller.toggle(restoreController);
-        if (wasFavorites) Lampa.Activity.refresh();
-      }
-    });
-  }
-
   function focusedElement() {
     try {
       if (window.Navigator && Navigator.getFocusedElement) return Navigator.getFocusedElement();
@@ -592,15 +562,31 @@
     genrePickerRow('Только жанры (хотя бы один; пусто = любые)', rules.include_genres);
   }
 
+  function openFavoritesFilter() {
+    var wasFavorites = (Lampa.Activity.active() || {}).component === 'favorite';
+    if (typeof $ === 'function' && !$('body').hasClass('settings--open')) Lampa.Controller.toggle('settings');
+    Lampa.Settings.create('lampa_filters_favorites', {
+      onBack: function () {
+        Lampa.Controller.toggle('settings');
+        if (wasFavorites) Lampa.Activity.refresh();
+      }
+    });
+  }
+
   function hookSettings() {
     Lampa.SettingsApi.addComponent({
       component: 'lampa_filters',
       icon: ICON,
       name: 'Фильтры подборок'
     });
+    Lampa.SettingsApi.addComponent({
+      component: 'lampa_filters_favorites',
+      icon: ICON,
+      name: 'Фильтр избранного'
+    });
 
     Lampa.Settings.listener.follow('open', function (event) {
-      if (event.name !== 'lampa_filters') return;
+      if (event.name !== 'lampa_filters' && event.name !== 'lampa_filters_favorites') return;
       var body = event.body;
       var scrollBody = body.find('.scroll__body').first();
       if (!scrollBody.length) scrollBody = body.find('.scroll__content').first();
@@ -610,14 +596,18 @@
       host.empty();
       var list = $('<div class="lampa-filters-list"></div>');
       host.append(list);
-      list.append('<div class="settings-param-title"><span>Подборки (релизы, каталог, главная, топ, коллекции)</span></div>');
-      addFilterControls(list, config, true);
-      var favRow = $('<div class="settings-param selector" data-static="true">' +
-        '<div class="settings-param__name">Избранное (отдельные правила)</div>' +
-        '<div class="settings-param__value">' + (config.favorites.enabled ? 'вкл, открыть' : 'выкл, открыть') + '</div></div>');
-      bindScrollIntoView(favRow);
-      favRow.on('hover:enter', openFilterModal);
-      list.append(favRow);
+      if (event.name === 'lampa_filters') {
+        list.append('<div class="settings-param-title"><span>Подборки (релизы, каталог, главная, топ, коллекции)</span></div>');
+        addFilterControls(list, config, true);
+        var favRow = $('<div class="settings-param selector" data-static="true">' +
+          '<div class="settings-param__name">Избранное (отдельные правила)</div>' +
+          '<div class="settings-param__value">' + (config.favorites.enabled ? 'вкл, открыть' : 'выкл, открыть') + '</div></div>');
+        bindScrollIntoView(favRow);
+        favRow.on('hover:enter', openFavoritesFilter);
+        list.append(favRow);
+      } else {
+        addFilterControls(list, config.favorites, false);
+      }
       try {
         var rows = list.find('.selector').toArray();
         if (rows.length && Lampa.Controller.collectionAppend) Lampa.Controller.collectionAppend(rows);
@@ -648,7 +638,7 @@
       } catch (error) {}
       if (headHtml && headHtml.length) {
         try {
-          Lampa.Head.addIcon(ICON, openFilterModal);
+          Lampa.Head.addIcon(ICON, openFavoritesFilter);
           console.log('[lampa-filters] кнопка фильтра добавлена в шапку');
         } catch (error) {
           console.warn('[lampa-filters]', error);
