@@ -52,7 +52,11 @@
   var DRAWER_CSS = [
     '.lampa-filters-list{width:100%;max-height:calc(100vh - 9em);overflow-y:auto;padding-right:0.5em}',
     '.lampa-filters-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:49}',
-    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:460px;max-width:92vw;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5)}',
+    '.lampa-filters-drawer{position:fixed;top:0;right:0;bottom:0;width:35%;z-index:50;box-shadow:-6px 0 24px rgba(0,0,0,.5);transform:translate3d(100%,0,0);transition:transform 0.2s}',
+    '.lampa-filters-drawer--open{transform:translate3d(0,0,0)}',
+    '@media screen and (max-width:767px){.lampa-filters-drawer{width:50%}}',
+    '@media screen and (max-width:580px){.lampa-filters-drawer{width:70%}}',
+    '@media screen and (max-width:480px){.lampa-filters-drawer{width:100%}}',
     '.lampa-filters-panel{display:flex;flex-direction:column;height:100%;background:#262829}',
     '.lampa-filters-panel__head{flex-shrink:0;padding:2em 2em 0.6em;font-size:2.2em;font-weight:300}',
     '.lampa-filters-panel__body{flex-grow:1;overflow-y:auto;padding-bottom:2em}',
@@ -88,6 +92,9 @@
     panelBody.append(body);
     addFilterControls(body, config.favorites, false);
     $('body').append(drawer);
+    setTimeout(function () {
+      drawer.addClass('lampa-filters-drawer--open');
+    }, 20);
     Lampa.Controller.add('lampa_filters_drawer', {
       toggle: function () {
         drawerToggled = true;
@@ -103,7 +110,11 @@
 
   function closeDrawer() {
     if (!drawer) return;
-    drawer.remove();
+    drawer.removeClass('lampa-filters-drawer--open');
+    var closing = drawer;
+    setTimeout(function () {
+      closing.remove();
+    }, 260);
     drawer = null;
     if (backdrop) {
       backdrop.remove();
