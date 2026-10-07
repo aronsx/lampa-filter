@@ -47,6 +47,17 @@ make test        # or: node test/test-lampa-filters.js
 - Quality data (`webdl`/`4K`/`ts`) is present only on lists enriched by the cub backend; other lists rely on the "keep unknown quality" rule.
 - Pages are filtered in place; no pagination refilling.
 
+## Note: local plugin URL and caching
+
+Lampa appends a cache-busting `reset=<random>` parameter only when the plugin
+URL contains **no IP address**. With `http://127.0.0.1:8180/...` the parameter
+is not added, so the browser may serve a stale script even after restarting
+Lampa. Options: use a hostname instead of an IP
+(`http://MacBook-Pro-3.local:8180/lampa-filters.plugin.js`), add your own
+version parameter (`...plugin.js?v=3`), or hard-reload (Cmd+Shift+R) after
+edits. The loaded version is printed to the console as
+`[lampa-filters] v<version> active: ...`.
+
 ## Security
 
 No credentials, accounts or API keys are required or stored. The plugin only filters responses inside the app and keeps its config in localStorage.
